@@ -19,7 +19,8 @@ object SJSIRCodegen {
     file.getParentFile.mkdir()
     val output = new FileOutputStream(file)
     try {
-      InfoSerializers.serialize(output, Infos.generateClassInfo(tree))
+      val infos = Infos.generateClassInfo(tree)
+      InfoSerializers.serialize(output, infos)
       Serializers.serialize(output, tree)
     } catch {
       case e: InvalidIRException => e.tree match {

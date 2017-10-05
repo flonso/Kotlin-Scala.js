@@ -95,7 +95,8 @@ object Scalajsld {
 
     for (options <- parser.parse(args, Options())) {
       val classpath = options.stdLib.toList ++ options.cp
-      val irContainers = IRFileCache.IRContainer.fromClasspath(classpath)
+      //val irContainers = IRFileCache.IRContainer.fromClasspath(classpath) // 0.6.15
+      val irContainers = FileScalaJSIRContainer.fromClasspath(classpath) // 1.0.0-M1
       val moduleInitializers = options.moduleInitializers
 
       val semantics =

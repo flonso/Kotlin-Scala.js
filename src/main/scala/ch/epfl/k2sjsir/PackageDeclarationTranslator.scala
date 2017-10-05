@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.js.translate.utils.{AnnotationsUtils, BindingUtils}
 import org.jetbrains.kotlin.psi._
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{AnyType, ClassType, NoType}
-import org.scalajs.core.ir.{ClassKind, Position}
+import org.scalajs.core.ir.{ClassKind, Position, Definitions}
 
 import scala.collection.JavaConversions._
 import scala.collection.immutable.{List, Nil}
@@ -57,17 +57,22 @@ final class PackageDeclarationTranslator private(
           }
         }
         if (topLevel.nonEmpty) {
+          val name = JvmFileClassUtil.getFileClassInfoNoResolve(file).getFileClassFqName.asString()
+          val encodedName = NameEncoder.encodeClassName(name, "")
+
+          implicit val pos = Position(Position.SourceFile(file.getName), 0, 0)
+
           val defs = topLevel.toList.map(x => GenFun(x)(context).tree)
+          val ctor = MethodDef(false, Ident("init___"), Nil, NoType,
+            Some(ApplyStatically(This()(ClassType(encodedName)), ClassType(Definitions.ObjectClass), Ident("init___"), Nil)(NoType)))(OptimizerHints.empty, None)
+          val ctorAndDefs = ctor :: defs
 
           val hasMain = defs.exists {
             case MethodDef(_, Ident("main__AT__V", _), _, _, _) => true
             case _ => false
           }
 
-          val pos = Position(Position.SourceFile(file.getName), 0, 0)
 
-          val name = JvmFileClassUtil.getFileClassInfoNoResolve(file).getFileClassFqName.asString()
-          val encodedName = NameEncoder.encodeClassName(name, "")
 
           def manualExports(): List[Tree] = {
             val body = Block(ApplyStatic(ClassType(encodedName), Ident("main__AT__V", Some("main"))(pos), List())(NoType)(pos), Undefined()(pos))(pos)
@@ -83,7 +88,7 @@ final class PackageDeclarationTranslator private(
               Some(Ident("O")(pos)),
               List(),
               None,
-              defs ++ (if (hasMain) manualExports() else Nil))(OptimizerHints.empty)(pos)
+              ctorAndDefs ++ (if (hasMain) manualExports() else Nil))(OptimizerHints.empty)(pos)
           SJSIRCodegen.genIRFile(output, name, cls)
         }
       } catch {

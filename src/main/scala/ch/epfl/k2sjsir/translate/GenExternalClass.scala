@@ -26,7 +26,8 @@ case class GenExternalClass(d: KtClassOrObject)(implicit val c: TranslationConte
     val idt = desc.toJsClassIdent
     val kind = if (isModule(desc)) ClassKind.NativeJSModuleClass else ClassKind.NativeJSClass
     val name = if(isModule(desc)) desc.getContainingDeclaration.getName.asString() else desc.getName.asString()
-    val jsNativeLoadSpec = Some(JSNativeLoadSpec.Global(List(name)))
+    //val jsNativeLoadSpec = Some(JSNativeLoadSpec.Global(List(name))) // 0.6.15
+    val jsNativeLoadSpec = Some(JSNativeLoadSpec.Global(name, Nil)) // 1.0.0-M1
 
     ClassDef(idt, kind, Some(Ident("sjs_js_Object")), List(), jsNativeLoadSpec, List())(optimizerHints)
   }
