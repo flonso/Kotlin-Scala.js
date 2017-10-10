@@ -21,7 +21,7 @@ case class GenConst(d: KtConstantExpression)(implicit val c: TranslationContext)
       case d: Double => DoubleLiteral(d)
       case b: Boolean => BooleanLiteral(b)
       case null => Null()
-      case _ => notImplemented
+      case _ => notImplemented()
     }
   }
 

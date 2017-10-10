@@ -17,10 +17,10 @@ trait Gen[T <: KtElement] {
 
   def tree: Tree
 
-  def notImplemented: Tree = {
+  def notImplemented(debugStr: String = ""): Tree = {
     val c = getClass.getSimpleName
     val name = if (d != null) d.getClass.getSimpleName else ""
-    println(s"Not supported $c: $name")
+    println(s"Not supported $c: $name" + (if (!debugStr.isEmpty) s" with message $debugStr" else ""))
     Debugger()
   }
 

@@ -13,7 +13,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
   protected val ROOT_SRC_LIB= "src/test/resources/src/lib"
   protected val ROOT_LIB_OUT= "src/test/resources/kotlin-out"
   protected val SCALA_JS_VERSION = "1.0.0-M1"
-  protected val SCALA_JS_JAR = "scalajs-library_2.11-"+ SCALA_JS_VERSION +".jar"
+  protected val SCALA_JS_JAR = "scalajs-library_2.12-"+ SCALA_JS_VERSION +".jar"
 
   protected val KOTLIN_HOME = scala.util.Properties.envOrElse("KOTLIN_HOME", "/usr/share/kotlin" )
 
@@ -23,7 +23,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
       if (f.getName.endsWith(".sjsir") || f.getName.endsWith(".js") || f.getName.endsWith(".class")) f.delete())
   }
 
-  after {
+  before {
     cleanOutput(new File(ROOT_OUT))
   }
 
@@ -37,8 +37,11 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
   protected def assertExecResult(expected: String, srcFile: String, outFile: String = "out.js", mainClass: String = "Test") = {
     new K2SJSIRCompiler()
       .exec(System.err, Array(s"$ROOT_SOURCE/$srcFile", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME):_*)
+
     Scalajsld.run(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
+
     val success = (s"echo $mainClass().main()" #>> new File(s"$ROOT_OUT/$outFile")).!
+
     if(success == 0) {
       val result = s"node $ROOT_OUT/$outFile".!!
       if(expected.replaceAll("\\s+", "") != result.replaceAll("\\s+", "") ) {

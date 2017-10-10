@@ -29,7 +29,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
           BinaryOp(BinaryOp.String_+, acc, expr match {
             case sl: KtLiteralStringTemplateEntry => StringLiteral(sl.getText)
             case st: KtStringTemplateEntry => GenExpr(st.getExpression).tree
-            case _ => notImplemented
+            case _ => notImplemented("after KtStringTemplateExpression")
           })
         })
       case kp: KtProperty =>
@@ -57,7 +57,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                   Apply(This()(recv.toJsClassType), m.getterIdent(), List())(tpe)
                 case x: ExpressionReceiver => Apply(This()(recv.toJsClassType), m.getterIdent(), List())(tpe)
                 case _ =>
-                  notImplemented
+                  notImplemented("after KtNameReferenceExpression > PropertyDescriptor")
               }
             }
           case lv: LocalVariableDescriptor =>
@@ -78,7 +78,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             if(external) LoadJSModule(lc.toJsClassType)
             else LoadModule(lc.toJsClassType)
           case _ =>
-            notImplemented
+            notImplemented("after KtNameReferenceExpression (default case)")
         }
       case k: KtConstantExpression => GenConst(k).tree
       case k: KtArrayAccessExpression => GenArrayAccess(k).tree
@@ -98,8 +98,9 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             val ao = if(isArray) arrayOps(receiver, tpe, desc.getName.asString(), args) else None
             ao.getOrElse({
               if (GenUnary.isUnaryOp(desc.getName.asString())) {
-                val op = GenUnary.convertToOp(receiver.tpe, tpe)
-                op.fold(notImplemented)(UnaryOp(_, receiver))
+                val op = GenUnary.convertToOp(receiver.tpe, tpe, receiver)
+
+                op.getOrElse(notImplemented(s"missing UnaryOp from ${receiver.tpe} to $tpe"))
               }
               else if (DescriptorUtils.isExtension(desc)) GenCall(call).genExtensionCall(receiver)
               else {
@@ -118,11 +119,11 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             ao.getOrElse({
               BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
                 case m: PropertyDescriptor => Apply(receiver, m.getterIdent(), List())(tpe)
-                case _ => notImplemented
+                case _ => notImplemented("after KtDotQualifiedExpression > KtNameReferenceExpression")
               }
             })
           case _ =>
-            notImplemented
+            notImplemented("after KtDotQualifiedExpression (default case)")
         }
       case k: KtUnaryExpression => GenUnary(k).tree
       case k: KtTryExpression =>
@@ -145,19 +146,19 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         If(cond, thenB, elseB.getOrElse(Skip()))(thenB.tpe)
       case k: KtReturnExpression => Return(GenExpr(k.getReturnedExpression).tree)
       case k: KtWhenExpression => GenWhen(k).tree
-      case k: KtSafeQualifiedExpression => notImplemented
+      case k: KtSafeQualifiedExpression => notImplemented()
       case kp: KtParenthesizedExpression => GenExpr(kp.getExpression).tree
       case kc: KtCallableReferenceExpression =>
         CallUtilKt.getResolvedCall(kc.getCallableReference, c.bindingContext()).getResultingDescriptor match {
           case f: FunctionDescriptor => genClosure(f)
-          case _ => notImplemented
+          case _ => notImplemented()
         }
       case l: KtLambdaExpression => genLambda(l)
       case w: KtWhileExpression =>
         val body = GenBody(w.getBody).tree
         val cond = GenExpr(w.getCondition).tree
         While(cond, body)
-      case _ => notImplemented
+      case _ => notImplemented("default case on tree")
     }
   }
 

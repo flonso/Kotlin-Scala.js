@@ -31,8 +31,8 @@ case class GenFor(d: KtForExpression)(implicit val c: TranslationContext) extend
       val end = GenExpr(range.getRight).tree
       genFor(BinaryOp.Num_<=, start, end, IntLiteral(1), value)
     } else if (isForOverRange(rangeType)) {
-      notImplemented
-    } else notImplemented
+      notImplemented()
+    } else notImplemented()
     // TODO: LoopTranslator.kt -> RangeLiteral, Range, Array, Iterator (default)
   }
 

@@ -26,8 +26,8 @@ case class GenWhen(d: KtWhenExpression)(implicit val c: TranslationContext) exte
       case e: KtWhenConditionWithExpression =>
         BinaryOp(BinaryOp.===, sub, GenExpr(e.getExpression).tree)
       case r: KtWhenConditionInRange =>
-        notImplemented
-      case _ => notImplemented
+        notImplemented()
+      case _ => notImplemented()
     }
     if (isNegated(cond)) UnaryOp(UnaryOp.Boolean_!, eval) else eval
   }

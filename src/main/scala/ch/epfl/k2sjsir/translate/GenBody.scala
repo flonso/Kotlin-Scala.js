@@ -12,7 +12,7 @@ case class GenBody(d: KtExpression)(implicit val c: TranslationContext) extends 
     case be: KtBlockExpression =>
       Block(be.getStatements.asScala.map(x => GenExpr(x).tree).toList)
     case e: KtExpression => Block(GenExpr(e).tree)
-    case _ => notImplemented
+    case _ => notImplemented()
   }
 
   def treeOption: Option[Tree] = if (d == null) None else Some(tree)

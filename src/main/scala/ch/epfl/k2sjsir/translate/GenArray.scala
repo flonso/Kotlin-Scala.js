@@ -25,7 +25,7 @@ case class GenArray(d: KtCallExpression, args: List[Tree])(implicit val c: Trans
       val tpe = desc.getReturnType.toJsArrayType
       ArrayValue(tpe, args)
     } else {
-      notImplemented
+      notImplemented()
     }
   }
 

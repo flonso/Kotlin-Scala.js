@@ -2,12 +2,70 @@
 
 class BlackBoxSimpleTests extends BlackBoxTest {
 
+  // FIXME: println Float and Double with decimal points
+  test("TestMethodsBaseTypes.kt") {
+    val expectedResult = {
+    """
+      |1000000
+      |1234567890123456
+      |999999999
+      |4293713502
+      |3530134674
+      |=== Type cast : from Int to X ===
+      |Int 1
+      |Byte 1
+      |Short 1
+      |Long 1
+      |Float 1
+      |Double 1
+      |=== Type cast : from Byte to X ===
+      |Byte 1
+      |Int 1
+      |Short 1
+      |Long 1
+      |Float 1
+      |Double 1
+      |=== Type cast : from Short to X ===
+      |Short 1
+      |Int 1
+      |Byte 1
+      |Long 1
+      |Float 1
+      |Double 1
+      |=== Type cast : from Long to X ===
+      |Long 1
+      |Int 1
+      |Byte 1
+      |Short 1
+      |Float 1
+      |Double 1
+      |=== Type cast : from Float to X ===
+      |Float 1
+      |Int 1
+      |Byte 1
+      |Short 1
+      |Long 1
+      |Double 1
+      |=== Type cast : from Double to X ===
+      |Double 1
+      |Int 1
+      |Byte 1
+      |Short 1
+      |Float 1
+      |Long 1
+    """.stripMargin
+    }
+
+    assertExecResult(expectedResult, "TestMethodsBaseTypes.kt", mainClass = "TestMethodsBaseTypesKt")
+  }
+
   test("TestSimplePrint.kt") {
     assertExecResult("1", "TestSimplePrint.kt", mainClass = "TestSimplePrintKt")
   }
 
   test("TestBinaryOps.kt") {
     val scalaResult = consoleToString {
+      printlnJSFormat(1.0f)
       printlnJSFormat(2 + 2)
       printlnJSFormat(2 - 2)
       printlnJSFormat(2 * 2)

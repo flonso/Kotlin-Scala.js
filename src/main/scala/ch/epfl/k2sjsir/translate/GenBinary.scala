@@ -37,7 +37,7 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
         val s = stringCompareTo(lhs, rhs)
         val binOp = numBinaryOp(op.toString)
         BinaryOp(binOp, s, IntLiteral(0))
-      } else notImplemented
+      } else notImplemented()
     } else if (isEquals(op)) {
       val binOp =
         if (isLongType(lhs.tpe) && isLongType(rhs.tpe)) longBinaryOp(op.toString)
@@ -48,7 +48,7 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
       val binOp = op match {
         case KtTokens.IDENTIFIER => getBinaryOp(desc.toJsName, tpe)
         case k: KtSingleValueToken => getBinaryOp(k.toString, tpe)
-        case _ => notImplemented; -1
+        case _ => notImplemented(); -1
       }
       val (clhs, crhs) = if(isLongOp(binOp, lhs.tpe, rhs.tpe)) {
         (intToLong(lhs), if (isLongSpecial(binOp)) longToInt(rhs) else intToLong(rhs))
@@ -62,7 +62,7 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
   }
 
   private def translateElvis(left: Tree, right: Tree): Tree = {
-    notImplemented
+    notImplemented()
   }
 
   private def isNotOverloadable(op: KtToken): Boolean =

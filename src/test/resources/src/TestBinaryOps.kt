@@ -1,5 +1,6 @@
 fun main(args: Array<String>) {
 
+    println(1.0f)
     println(2+2)
     println(2-2)
     println(2*2)

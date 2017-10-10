@@ -34,7 +34,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
           Apply(rec, method, args)(rtpe)
         }
         else if (GenArray.isArrayOps(desc)) GenArray(d, args).tree
-        else notImplemented
+        else notImplemented()
 
       case cc: ClassConstructorDescriptor =>
         val ctpe = if(cc.getContainingDeclaration.getName.toString == "Exception") ClassType("jl_Exception")
@@ -52,14 +52,14 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
             case i: ImplicitClassReceiver => This()(i.getClassDescriptor.toJsClassType)
             case e: ExtensionReceiver => VarRef(dr.toJsIdent)(dr.getType.toJsType)
             case e: ExpressionReceiver => GenExpr(e.getExpression).tree
-            case _ => notImplemented
+            case _ => notImplemented()
 
           }
           val name = if(desc.getName.toString == "invoke") NameEncoder.encodeApply(desc) else desc.toJsMethodIdent
           Apply(receiver, name, args)(rtpe)
         }
       case _ =>
-        notImplemented
+        notImplemented()
     }
   }
 
