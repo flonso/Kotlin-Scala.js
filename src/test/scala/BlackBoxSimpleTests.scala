@@ -2,6 +2,36 @@
 
 class BlackBoxSimpleTests extends BlackBoxTest {
 
+  test("TestIsOperator.kt") {
+    val expectedResult =
+      """
+        |1.7 is an Int
+        |1.7 is a Double
+        |1.7 is not a Long
+        |1.7 is not Derived class
+        |4 is an Int
+        |4 is a Double
+        |4 is not a Long
+        |4 is not Derived class
+        |23432542300000 is a Long
+        |23432542300000 is not an Int
+        |23432542300000 is not a Double
+        |23432542300000 is not Derived class
+        |Derived with p = 4 is not an Int
+        |Derived with p = 4 is not a Double
+        |Derived with p = 4 is not a Long
+        |Derived with p = 4 is Base class
+        |Derived with p = 4 is Derived class
+        |Base with p = 4 is not an Int
+        |Base with p = 4 is not a Double
+        |Base with p = 4 is not a Long
+        |Base with p = 4 is Base class
+        |Base with p = 4 is not Derived class
+      """.stripMargin
+
+    assertExecResult(expectedResult, "TestIsOperator.kt", mainClass = "TestIsOperatorKt")
+  }
+
   // FIXME: println Float and Double with decimal points
   test("TestMethodsBaseTypes.kt") {
     val expectedResult = {

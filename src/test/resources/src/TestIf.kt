@@ -12,4 +12,7 @@ fun main(args: Array<String>) {
     if(a == 2) println("error")
     else if(a == 1) println(1)
     else println("error")
+
+    /* With negation */
+    if (!(a == 2)) println(a)
 }
