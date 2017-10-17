@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.descriptors.ClassKind.OBJECT
 import org.jetbrains.kotlin.descriptors.{ClassConstructorDescriptor, ClassDescriptor, PropertyDescriptor}
 import org.jetbrains.kotlin.js.translate.utils.PsiUtils.getPrimaryConstructorParameters
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
+import org.jetbrains.kotlin.js.translate.utils.AnnotationsUtils
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils._
 import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.DescriptorUtils
@@ -25,9 +26,12 @@ case class GenExternalClass(d: KtClassOrObject)(implicit val c: TranslationConte
   override def tree: ClassDef = {
     val idt = desc.toJsClassIdent
     val kind = if (isModule(desc)) ClassKind.NativeJSModuleClass else ClassKind.NativeJSClass
-    val name = if(isModule(desc)) desc.getContainingDeclaration.getName.asString() else desc.getName.asString()
-    //val jsNativeLoadSpec = Some(JSNativeLoadSpec.Global(List(name))) // 0.6.15
-    val jsNativeLoadSpec = Some(JSNativeLoadSpec.Global(name, Nil)) // 1.0.0-M1
+
+    val jsName = AnnotationsUtils.getJsName(desc)
+    val hasAnnotation = Option(jsName).isDefined
+
+    val name = if (hasAnnotation) jsName else if(isModule(desc)) desc.getContainingDeclaration.getName.asString() else desc.getName.asString()
+    val jsNativeLoadSpec = Some(JSNativeLoadSpec.Global(name, Nil))
 
     ClassDef(idt, kind, Some(Ident("sjs_js_Object")), List(), jsNativeLoadSpec, List())(optimizerHints)
   }

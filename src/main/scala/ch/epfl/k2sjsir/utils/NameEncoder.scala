@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.builtins.BuiltInsPackageFragment
 import org.jetbrains.kotlin.descriptors.ClassKind.INTERFACE
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
+import org.jetbrains.kotlin.js.translate.utils.TranslationUtils
 import org.jetbrains.kotlin.load.java.`lazy`.descriptors.LazyJavaPackageFragment
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.DescriptorUtils
@@ -18,6 +19,7 @@ import org.scalajs.core.ir.{Definitions, Position}
 import scala.collection.JavaConverters._
 
 object NameEncoder {
+
   /** Outer separator string (between parameter types) */
   private val OuterSep = "__"
 
@@ -39,7 +41,8 @@ object NameEncoder {
     if (isKeyword(n) || n(0).isDigit || n(0) == '$') "$" + n else n
   }
 
-  private[utils] def encodeClassFullNameIdent(d: ClassDescriptor)(implicit pos: Position): Ident =
+  private[utils] def encodeClassFullNameIdent(d: ClassDescriptor)(
+      implicit pos: Position): Ident =
     Ident(encodeClassFullName(d), Some(d.getName.asString()))
 
   def encodeClassName(className: String, suffix: String): String = {
@@ -57,38 +60,54 @@ object NameEncoder {
     encodeClassName(className, suffix)
   }
 
-  private[utils] def encodeMethodIdent(d: CallableDescriptor, reflProxy: Boolean = false)(implicit pos: Position): Ident =
+  private[utils] def encodeMethodIdent(
+      d: CallableDescriptor,
+      reflProxy: Boolean = false)(implicit pos: Position): Ident =
     Ident(encodeMethodName(d, reflProxy), Some(d.getName.asString()))
 
-  private[utils] def encodeMethodName(d: CallableDescriptor, reflProxy: Boolean = false)(implicit pos: Position): String =
+  private[utils] def encodeMethodName(
+      d: CallableDescriptor,
+      reflProxy: Boolean = false)(implicit pos: Position): String =
     encodeMethodNameInternal(d, reflProxy).mkString
 
-  private def encodeMethodNameInternal(d: CallableDescriptor, reflProxy: Boolean = false, inRTClass: Boolean = false)(implicit pos: Position): Seq[String] = {
+  private def encodeMethodNameInternal(
+      d: CallableDescriptor,
+      reflProxy: Boolean = false,
+      inRTClass: Boolean = false)(implicit pos: Position): Seq[String] = {
     val name = encodeMemberNameInternal(d.getName.asString())
     def privateSuffix(cl: Option[ClassDescriptor]) = cl.fold("") { c =>
       if (c.getKind == INTERFACE && !c.isImpl) encodeClassFullName(c)
-      else getAllSuperclassesWithoutAny(c).asScala.count(_.getKind != INTERFACE).toString
+      else
+        getAllSuperclassesWithoutAny(c).asScala
+          .count(_.getKind != INTERFACE)
+          .toString
     }
     val owner: Option[ClassDescriptor] = d.getContainingDeclaration match {
-      case c: ClassDescriptor => Some(c)
+      case c: ClassDescriptor     => Some(c)
       case t: TypeAliasDescriptor => Some(t.getClassDescriptor)
-      case _: LazyPackageDescriptor | _: LazyJavaPackageFragment
-           | _: BuiltInsPackageFragment => Option(getContainingClass(d))
+      case _: LazyPackageDescriptor | _: LazyJavaPackageFragment |
+          _: BuiltInsPackageFragment =>
+        Option(getContainingClass(d))
       case x => throw new Error(s"${getClass.toString}: Not supported yet: $x")
     }
     val isPrivate = d.getVisibility == Visibilities.PRIVATE
     val encodedName =
       if (isInit(name)) "init" + InnerSep
-      else if (isPrivate) encodeName(name) + OuterSep + "p" + privateSuffix(owner)
+      else if (isPrivate)
+        encodeName(name) + OuterSep + "p" + privateSuffix(owner)
       else encodeName(name)
     val paramsString = makeParamsString(d, reflProxy, inRTClass)
     Seq(encodedName, paramsString)
   }
 
-  private def makeParamsString(d: CallableDescriptor, reflProxy: Boolean, inRTClass: Boolean)(implicit pos: Position): String = {
+  private def makeParamsString(
+      d: CallableDescriptor,
+      reflProxy: Boolean,
+      inRTClass: Boolean)(implicit pos: Position): String = {
     val params0 = d.getValueParameters.asScala.map(_.toJsInternal)
     val x = d.getExtensionReceiverParameter
-    val params1 = if (x == null) params0 else x.getReturnType.toJsInternal +: params0
+    val params1 =
+      if (x == null) params0 else x.getReturnType.toJsInternal +: params0
     val params =
       if (isInit(d.getName.asString())) params1
       else if (reflProxy) params1 :+ ""
@@ -98,19 +117,34 @@ object NameEncoder {
 
   def encodeApply(desc: CallableDescriptor)(implicit pos: Position): Ident = {
     val retType = desc.getReturnType.toJsInternal
-    val concatType = desc.getValueParameters.asScala.map(_.toJsInternal).mkString("")
+    val concatType =
+      desc.getValueParameters.asScala.map(_.toJsInternal).mkString("")
     val types =
       if (desc.getValueParameters.isEmpty) ""
-      else desc.getValueParameters.asScala.map(_.toJsInternal).mkString(OuterSep, OuterSep, "")
+      else
+        desc.getValueParameters.asScala
+          .map(_.toJsInternal)
+          .mkString(OuterSep, OuterSep, "")
     Ident(s"apply$$mc$retType$concatType$$sp${types}__$retType")
   }
 
   def encodeWithSourceFile(d: DeclarationDescriptor): String = {
-    val b: PsiSourceFile = DescriptorUtils.getContainingSourceFile(d).asInstanceOf[PsiSourceFile]
-    val name = JvmFileClassUtil.getFileClassInfoNoResolve(b.getPsiFile.asInstanceOf[KtFile]).getFileClassFqName.asString()
-    NameEncoder.encodeClassName(name, "")
+    val srcFile: SourceFile = DescriptorUtils.getContainingSourceFile(d)
+
+    if (srcFile == SourceFile.NO_SOURCE_FILE) {
+      return NameEncoder.encodeClassName("kotlin.Stdlib", "") // FIXME: This needs to be the local "scope" of the class
+    }
+
+    val psiSrcFile: PsiSourceFile = srcFile.asInstanceOf[PsiSourceFile]
+
+    val name = JvmFileClassUtil
+      .getFileClassInfoNoResolve(psiSrcFile.getPsiFile.asInstanceOf[KtFile])
+      .getFileClassFqName
+
+    NameEncoder.encodeClassName(name.asString(), "")
   }
 
-  private def encodeMemberNameInternal(s: String): String = s.replace("_", "$und")
+  private def encodeMemberNameInternal(s: String): String =
+    s.replace("_", "$und")
 
 }
