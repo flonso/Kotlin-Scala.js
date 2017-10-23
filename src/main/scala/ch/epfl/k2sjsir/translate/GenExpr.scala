@@ -159,7 +159,11 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         val cond = GenExpr(w.getCondition).tree
         While(cond, body)
       case k: KtIsExpression => GenIs(k).tree
-      case _ => notImplemented("default case on tree")
+      case k: KtThisExpression =>
+        val tpe = c.bindingContext().getType(k)
+        This()(tpe.toJsType)
+      case _ =>
+        notImplemented("default case on tree")
     }
   }
 
@@ -173,6 +177,8 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         Some(Assign(ArraySelect(receiver, args.head)(args(1).tpe), args(1)))
       case "size" =>
         Some(ArrayLength(receiver))
+      case "iterator" =>
+        None
       case _ => None
     }
   }
