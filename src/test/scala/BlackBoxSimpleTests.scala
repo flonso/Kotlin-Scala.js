@@ -1,12 +1,41 @@
 
 
 class BlackBoxSimpleTests extends BlackBoxTest {
+  /*
+  test("TestJsFunc.kt") {
+    assertExecResult("fail", "TestJsFunc.kt", mainClass = "TestJsFuncKt")
+  }
+  */
+
+  // TODO: Complete this test
+  test("TestThisKeyword.kt") {
+    class MyClass(val num: Int) {
+      def myDef: Unit = {
+        println("myDef")
+      }
+
+      def equals(b: MyClass): Boolean = {
+        this.myDef
+        this.num == b.num
+      }
+    }
+
+    val res = consoleToString {
+      val a = new MyClass(1)
+      val b = new MyClass(1)
+      val c = new MyClass(2)
+
+      printlnJSFormat(a.equals(b))
+      printlnJSFormat(a.equals(c))
+    }
+    assertExecResult(res, "TestThisKeyword.kt", mainClass = "TestThisKeywordKt")
+  }
 
   test("TestIsOperator.kt") {
     val expectedResult =
       """
-        |1.7 is an Int
         |1.7 is a Double
+        |1.7 is not an Int
         |1.7 is not a Long
         |1.7 is not Derived class
         |4 is an Int
@@ -95,6 +124,23 @@ class BlackBoxSimpleTests extends BlackBoxTest {
 
   test("TestBinaryOps.kt") {
     val scalaResult = consoleToString {
+      class MyClassA(val num: Int)
+
+      val a = new MyClassA(0)
+      val b = new MyClassA(0)
+      val c = a
+      val d = new MyClassA(1)
+
+      printlnJSFormat(a === b)
+      printlnJSFormat(b === a)
+      printlnJSFormat(a == b)
+      printlnJSFormat(b == a)
+      printlnJSFormat(a === a)
+      printlnJSFormat(b === b)
+      printlnJSFormat(a === c)
+      printlnJSFormat(a !== b)
+      printlnJSFormat(a != d)
+
       printlnJSFormat(1.0f)
       printlnJSFormat(2 + 2)
       printlnJSFormat(2 - 2)
@@ -296,7 +342,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
     assertExecResult(result, "TestArraysBase.kt", mainClass = "TestArraysBaseKt")
   }
 
-  /*test("TestArrayIterator.kt") {
+  /*
+  test("TestArrayIterator.kt") {
     val result = consoleToString {
       val a = Seq(3, 2, 3, 12.5)
       a.foreach(printlnJSFormat)
@@ -304,7 +351,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       val b = Seq(12, 42)
       b.foreach(println)
     }
-    assertExecResult(result, "TestArrayIterator.kt")
+    assertExecResult(result, "TestArrayIterator.kt", mainClass = "TestArrayIteratorKt")
   }*/
 
   test("TestVarIncrease.kt") {

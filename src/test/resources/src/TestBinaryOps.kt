@@ -1,4 +1,20 @@
+class MyClassA(val num: Int)
+
 fun main(args: Array<String>) {
+    val a = MyClassA(0)
+    val b = MyClassA(0)
+    val c = a
+    val d = MyClassA(1)
+
+    println(a === b)
+    println(b === a)
+    println(a == b)
+    println(b == a)
+    println(a === a)
+    println(b === b)
+    println(a === c)
+    println(a !== b)
+    println(a != d)
 
     println(1.0f)
     println(2+2)

@@ -38,11 +38,55 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
         val binOp = numBinaryOp(op.toString)
         BinaryOp(binOp, s, IntLiteral(0))
       } else notImplemented()
-    } else if (isEquals(op)) {
+    } else if (isStructCompare(op)) {
       val binOp =
-        if (isLongType(lhs.tpe) && isLongType(rhs.tpe)) longBinaryOp(op.toString)
-        else if (isNumericType(lhs.tpe) && isNumericType(rhs.tpe)) numBinaryOp(op.toString)
-        else builtinBinarOp(op.toString)
+        if (isLongType(lhs.tpe) && isLongType(rhs.tpe)) Some(longBinaryOp(op.toString))
+        else if (isNumericType(lhs.tpe) && isNumericType(rhs.tpe)) Some(numBinaryOp(op.toString))
+        else None
+
+      if(binOp.nonEmpty)
+        BinaryOp(binOp.get, lhs, rhs)
+      else {
+        // See structural equality definition in Kotlin docs
+
+        val lhsName = Ident("x$1")
+        val rhsName = Ident("x$2")
+
+        val lhsDef = VarDef(lhsName, lhs.tpe, false, lhs)
+        val rhsDef = VarDef(rhsName, rhs.tpe, false, rhs)
+
+        val lhsRef = VarRef(lhsName)(lhs.tpe)
+        val rhsRef = VarRef(rhsName)(rhs.tpe)
+
+        val equalsIdent = Ident("equals__O__Z", Some("equals"))
+
+        val finalIf = If(
+          BinaryOp(
+            BinaryOp.===,
+            lhsRef,
+            Null()
+          ),
+          BinaryOp(
+            BinaryOp.===,
+            rhsRef,
+            Null()
+          ),
+          Apply(lhsRef, equalsIdent, List(rhsRef))(BooleanType)
+        )(BooleanType)
+
+        val block = Block(List(
+          lhsDef,
+          rhsDef,
+          finalIf
+        ))
+
+        if (op == KtTokens.EXCLEQ)
+          UnaryOp(UnaryOp.Boolean_!, block)
+        else
+          block
+      }
+    } else if (isRefCompare(op)) {
+      val binOp = builtinBinarOp(op.toString)
       BinaryOp(binOp, lhs, rhs)
     } else {
       val binOp = op match {
@@ -68,9 +112,11 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
   private def isNotOverloadable(op: KtToken): Boolean =
     OperatorConventions.NOT_OVERLOADABLE.contains(op)
 
-  private def isEquals(op: KtToken): Boolean =
+  private def isStructCompare(op: KtToken): Boolean =
     (op == KtTokens.EQEQ) || (op == KtTokens.EXCLEQ)
 
+  private def isRefCompare(op: KtToken): Boolean =
+    (op == KtTokens.EQEQEQ) || (op == KtTokens.EXCLEQEQEQ)
 }
 
 object GenBinary {
@@ -182,9 +228,10 @@ object GenBinary {
     "PLUS" -> BinaryOp.String_+
   )
 
+
   private val builtinBinarOp = Map(
-    "EQEQ" -> BinaryOp.===,
-    "EXCLEQ" -> BinaryOp.!==
+    "EQEQEQ" -> BinaryOp.===,
+    "EXCLEQEQEQ" -> BinaryOp.!==
   )
 
   private def opMap(tpe: Type): Map[String, Int] = tpe match {
