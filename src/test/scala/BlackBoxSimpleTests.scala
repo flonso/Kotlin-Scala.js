@@ -7,6 +7,51 @@ class BlackBoxSimpleTests extends BlackBoxTest {
   }
   */
 
+  // TODO: Write some doc in GenProperty
+  test("TestAccessorsGen.kt") {
+    val res = consoleToString {
+
+      class MyClassWithAccessors {
+        private var _myVar: Int = 0
+        def myVar: Int = _myVar
+        def myVar_=(value: Int) = {
+          if (value >= 2)
+            _myVar = value - 1
+          else
+            _myVar = -1
+        }
+
+        val _name: String = "name"
+        def name(): String = _name
+
+        val id: Int = 1
+
+        private var _tmp: String = "tmp"
+
+        def tmp = _tmp
+        def tmp_= (value: String): Unit = {
+          _tmp = value + "_set"
+        }
+      }
+
+
+      val a = new MyClassWithAccessors
+
+      printlnJSFormat(a.id)
+      printlnJSFormat(a.name)
+      printlnJSFormat(a.myVar)
+      a.myVar = 4
+      printlnJSFormat(a.myVar)
+      a.myVar = 0
+      printlnJSFormat(a.myVar)
+      printlnJSFormat(a.tmp)
+      a.tmp = "tmp2"
+      printlnJSFormat(a.tmp)
+    }
+
+    assertExecResult(res, "TestAccessorsGen.kt", mainClass = "TestAccessorsGenKt")
+  }
+
   // TODO: Complete this test
   test("TestThisKeyword.kt") {
     class MyClass(val num: Int) {

@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.descriptors.ClassKind.OBJECT
 import org.jetbrains.kotlin.descriptors.{ClassConstructorDescriptor, ClassDescriptor, PropertyDescriptor}
 import org.jetbrains.kotlin.js.translate.utils.PsiUtils.getPrimaryConstructorParameters
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
+import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils._
 import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.DescriptorUtils
@@ -30,7 +31,8 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
     val jsNativeLoadSpec = None
 
     val defs : List[Tree] = d.getDeclarations.asScala.collect {
-      case p : KtProperty => GenProperty(p).withGetterAndSetter
+      case p : KtProperty =>
+        GenProperty(p).withGetterAndSetter
       case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
         /**
           * This is a special case, all those element are either used in the constructor (for property init) or
@@ -54,13 +56,14 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
         val tpe = p.getType.toJsType
         FieldDef(static = false, name, tpe, mutable = p.getSetter != null)  ::
           Option(p.getGetter).map(get => GenProperty.getter(get)).toList ++
-          Option(p.getSetter).map(set => GenProperty.setter(set)).toList
+          Option(p.getSetter). map(set => GenProperty.setter(set)).toList
       }).toList
 
     val hasMain = defs.exists {
       case MethodDef(_, Ident("main__V", _), _, _, _) => true
       case _ => false
     }
+
     val constructors = genConstructors
     val allDefs = paramsInit ++ defs.toList ++ constructors
     ClassDef(idt, kind, Some(superClass.toJsClassIdent), interfaces.map(_.toJsClassIdent).toList, jsNativeLoadSpec, allDefs)(optimizerHints)
@@ -110,10 +113,13 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       }).toList
 
     val declsInit = d.getDeclarations.asScala.collect {
-      case p: KtProperty =>
+      case p: KtProperty if p.getAccessors.isEmpty || p.isVar =>
         val expr = GenExpr(p.getDelegateExpressionOrInitializer).tree
+
         Assign(Select(This()(desc.toJsClassType), Ident(p.getName))(expr.tpe), expr)
-      case i: KtClassInitializer => GenBody(i.getBody).tree
+      case i: KtClassInitializer =>
+        GenBody(i.getBody).tree
+
     }.toList
 
     val superCall = Option(getSuperCall(c.bindingContext(), d)) match {

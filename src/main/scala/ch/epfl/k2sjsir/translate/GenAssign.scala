@@ -1,7 +1,7 @@
 package ch.epfl.k2sjsir.translate
 
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
+import org.jetbrains.kotlin.descriptors.impl.{LocalVariableDescriptor, SyntheticFieldDescriptor}
 import org.jetbrains.kotlin.descriptors.{ClassDescriptor, DeclarationDescriptor, PropertyDescriptor}
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.reference.{AccessTranslationUtils, ArrayAccessTranslator, BackingFieldAccessTranslator, VariableAccessTranslator}
@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.js.translate.utils.BindingUtils._
 import org.jetbrains.kotlin.js.translate.utils.PsiUtils._
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi._
+import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ClassValueReceiver, ExpressionReceiver}
 import org.scalajs.core.ir.Trees._
@@ -62,6 +63,21 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
         case a: ArrayAccessTranslator =>
           if(d.getOperationToken == KtTokens.EQ) Assign(GenExpr(left).tree, right)
           else ArraySelect(GenExpr(left).tree, right)(tpe)
+
+        case b: BackingFieldAccessTranslator =>
+          val call = CallUtilKt.getResolvedCallWithAssert(left, c.bindingContext())
+
+          val backingField = call.getResultingDescriptor match {
+            case s: SyntheticFieldDescriptor =>
+              val property = s.getPropertyDescriptor
+              val thisTpe = DescriptorUtils.getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
+              val name = property.getName.asString()
+
+              Select(This()(thisTpe), Ident(name))(tpe)
+          }
+
+          Assign(backingField, right)
+        case t => notImplemented(t.toString)
       }
     }
   }
