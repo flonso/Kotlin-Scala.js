@@ -1,13 +1,17 @@
 
 
 class BlackBoxSimpleTests extends BlackBoxTest {
-  /*
-  test("TestJsFunc.kt") {
-    assertExecResult("fail", "TestJsFunc.kt", mainClass = "TestJsFuncKt")
-  }
-  */
 
-  // TODO: Write some doc in GenProperty
+  test("TestJsFunc.kt") {
+    val res =
+      """
+        |1
+        |3
+        |6
+      """.stripMargin
+    assertExecResult(res, "TestJsFunc.kt", mainClass = "TestJsFuncKt")
+  }
+
   test("TestAccessorsGen.kt") {
     val res = consoleToString {
 
@@ -281,6 +285,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
   test("TestIf.kt") {
     assertExecResult(
       """
+        |1
+        |1
         |1
         |1
         |1

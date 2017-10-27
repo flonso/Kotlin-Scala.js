@@ -15,4 +15,6 @@ fun main(args: Array<String>) {
 
     /* With negation */
     if (!(a == 2)) println(a)
+
+    if (a != 2) println(a)
 }
