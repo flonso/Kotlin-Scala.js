@@ -57,8 +57,8 @@ final class PackageDeclarationTranslator private(
           }
         }
         if (topLevel.nonEmpty) {
-          val name = JvmFileClassUtil.getFileClassInfoNoResolve(file).getFileClassFqName.asString()
-          val encodedName = NameEncoder.encodeClassName(name, "")
+          val className = JvmFileClassUtil.getFileClassInfoNoResolve(file).getFileClassFqName.asString()
+          val encodedName = NameEncoder.encodeClassName(className, "")
 
           implicit val pos = Position(Position.SourceFile(file.getName), 0, 0)
 
@@ -77,7 +77,7 @@ final class PackageDeclarationTranslator private(
           def manualExports(): List[Tree] = {
             val body = Block(ApplyStatic(ClassType(encodedName), Ident("main__AT__V", Some("main"))(pos), List())(NoType)(pos), Undefined()(pos))(pos)
             val main = MethodDef(static = false, StringLiteral("main")(pos), Nil, AnyType, Some(body))(OptimizerHints.empty, None)(pos)
-            val mod = ModuleExportDef(name)(pos)
+            val mod = ModuleExportDef(className)(pos)
             List(main, mod)
           }
 
@@ -89,6 +89,8 @@ final class PackageDeclarationTranslator private(
               List(),
               None,
               ctorAndDefs ++ (if (hasMain) manualExports() else Nil))(OptimizerHints.empty)(pos)
+
+          val name = encodedName.drop(1).replace("_", "/")
           SJSIRCodegen.genIRFile(output, name, cls)
         }
       } catch {
