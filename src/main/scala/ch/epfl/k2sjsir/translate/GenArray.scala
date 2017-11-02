@@ -53,7 +53,8 @@ object GenArray {
 
   def isArrayOps(d: CallableDescriptor): Boolean = {
     val name = d.getName.asString()
-    arrayFuns(name) || specialArrays(name) || (d.getDispatchReceiverParameter.getValue != null &&
+    val rcv = d.getDispatchReceiverParameter
+    arrayFuns(name) || specialArrays(name) || (rcv != null && rcv.getValue != null &&
       (d.getDispatchReceiverParameter.getType.toJsType.isInstanceOf[ArrayType] ||
         isGenericNext(d)))
   }

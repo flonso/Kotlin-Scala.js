@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
-import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver}
+import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver, ReceiverValue}
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedSimpleFunctionDescriptor
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.ClassType
@@ -40,46 +40,39 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
         else notImplemented("while looking at DeserializedSimpleFunctionDescriptor")
 
       case cc: ClassConstructorDescriptor =>
-        val ctpe = if(cc.getContainingDeclaration.getName.toString == "Exception") ClassType("jl_Exception")
-        else cc.getContainingDeclaration.toJsClassType
-        if(!cc.getContainingDeclaration.isExternal) New(ctpe, desc.toJsMethodIdent, args)
-        else JSNew(LoadJSConstructor(ctpe), args)
+        val ctpe =
+          if(cc.getContainingDeclaration.getName.toString == "Exception")
+            ClassType("jl_Exception")
+          else
+            cc.getContainingDeclaration.toJsClassType
+
+        if(!cc.getContainingDeclaration.isExternal)
+          New(ctpe, desc.toJsMethodIdent, args)
+        else
+          JSNew(LoadJSConstructor(ctpe), args)
 
       case sf: SimpleFunctionDescriptor =>
         val dr = Option(desc.getDispatchReceiverParameter).getOrElse(desc.getExtensionReceiverParameter)
 
-        if(DescriptorUtils.isExtension(desc))
+        if(DescriptorUtils.isExtension(desc)) {
+
           genExtensionCall(VarRef(dr.toJsIdent)(dr.getType.toJsType))
+        }
         else if(isTopLevelFunction(sf)) {
+
           ApplyStatic(ClassType(NameEncoder.encodeWithSourceFile(sf)), desc.toJsMethodIdent, args)(desc.getReturnType.toJsType)
         }
         else {
           val dispatchReceiver = resolved.getDispatchReceiver
 
-          val isJsFuncCall = dispatchReceiver match {
-            case e: ExpressionReceiver =>
-              val subResolvedCall = CallUtilKt
-                .getResolvedCall(e.getExpression, c.bindingContext())
-
-              if (subResolvedCall != null) {
-
-                val name = subResolvedCall
-                  .getResultingDescriptor
-                  .getName
-                  .asString()
-
-                name == "js"
-              } else {
-                false
-              }
-            case _ => false
-          }
+          if (isDirectCallToJsFunc(dispatchReceiver))
+            GenJsFunc(d).tree
 
           val receiver = dispatchReceiver match {
             case i: ImplicitClassReceiver => This()(i.getClassDescriptor.toJsClassType)
             case e: ExtensionReceiver => VarRef(dr.toJsIdent)(dr.getType.toJsType)
             case e: ExpressionReceiver =>
-              if (isJsFuncCall)
+              if (isReceiverJsFunc(dispatchReceiver))
                 GenJsFunc(e.getExpression.asInstanceOf[KtCallExpression]).tree
               else
                 GenExpr(e.getExpression).tree
@@ -88,7 +81,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
           }
 
           // If it's a call to kotlin js func, pass the arguments to the call directly
-          if (isJsFuncCall) {
+          if (isReceiverJsFunc(dispatchReceiver)) {
             receiver match {
               case Apply(r, n, _) =>
                 Apply(r, n, args)(rtpe)
@@ -106,6 +99,31 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
         }
       case _ =>
         notImplemented("in tree method")
+    }
+  }
+
+  private def isDirectCallToJsFunc(rcv: ReceiverValue): Boolean = {
+    rcv == null && name == "js"
+  }
+
+  private def isReceiverJsFunc(rcv: ReceiverValue): Boolean = {
+    rcv match {
+      case e: ExpressionReceiver if name == "invoke" =>
+        val subResolvedCall = CallUtilKt
+          .getResolvedCall(e.getExpression, c.bindingContext())
+
+        if (subResolvedCall != null) {
+
+          val name = subResolvedCall
+            .getResultingDescriptor
+            .getName
+            .asString()
+
+          name == "js"
+        } else {
+          false
+        }
+      case _ => false
     }
   }
 
