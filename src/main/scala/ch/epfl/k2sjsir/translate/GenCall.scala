@@ -67,34 +67,35 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
 
           if (isDirectCallToJsFunc(dispatchReceiver))
             GenJsFunc(d).tree
-
-          val receiver = dispatchReceiver match {
-            case i: ImplicitClassReceiver => This()(i.getClassDescriptor.toJsClassType)
-            case e: ExtensionReceiver => VarRef(dr.toJsIdent)(dr.getType.toJsType)
-            case e: ExpressionReceiver =>
-              if (isReceiverJsFunc(dispatchReceiver))
-                GenJsFunc(e.getExpression.asInstanceOf[KtCallExpression]).tree
-              else
-                GenExpr(e.getExpression).tree
-            case _ => notImplemented("while looking for receiver")
-
-          }
-
-          // If it's a call to kotlin js func, pass the arguments to the call directly
-          if (isReceiverJsFunc(dispatchReceiver)) {
-            receiver match {
-              case Apply(r, n, _) =>
-                Apply(r, n, args)(rtpe)
-            }
-          }
           else {
-            val name =
-              if (desc.getName.toString == "invoke")
-                NameEncoder.encodeApply(desc)
-              else
-                desc.toJsMethodIdent
+            val receiver = dispatchReceiver match {
+              case i: ImplicitClassReceiver => This()(i.getClassDescriptor.toJsClassType)
+              case e: ExtensionReceiver => VarRef(dr.toJsIdent)(dr.getType.toJsType)
+              case e: ExpressionReceiver =>
+                if (isReceiverJsFunc(dispatchReceiver))
+                  GenJsFunc(e.getExpression.asInstanceOf[KtCallExpression]).tree
+                else
+                  GenExpr(e.getExpression).tree
+              case _ => notImplemented("while looking for receiver")
 
-            Apply(receiver, name, args)(rtpe)
+            }
+
+            // If it's a call to kotlin js func, pass the arguments to the call directly
+            if (isReceiverJsFunc(dispatchReceiver)) {
+              receiver match {
+                case Apply(r, n, _) =>
+                  Apply(r, n, args)(rtpe)
+              }
+            }
+            else {
+              val name =
+                if (desc.getName.toString == "invoke")
+                  NameEncoder.encodeApply(desc)
+                else
+                  desc.toJsMethodIdent
+
+              Apply(receiver, name, args)(rtpe)
+            }
           }
         }
       case _ =>

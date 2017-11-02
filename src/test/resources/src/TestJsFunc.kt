@@ -1,3 +1,5 @@
+package kotlin.js
+external fun js(code: String): dynamic
 
 fun main(args: Array<String>) {
 
@@ -13,7 +15,6 @@ class MyClassForJsFunc {
         val str = "Kotlin.identityHashCode"
         js(str)(this)
         */
-
         val res1 = js("Kotlin.identityHashCode")(this)
         val res2 = js("Kotlin.identityHashCode")(3)
         val res3 = js("Kotlin.identityHashCode")(1 + 2 + 3)

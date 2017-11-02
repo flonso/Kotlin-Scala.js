@@ -3,13 +3,44 @@
 class BlackBoxSimpleTests extends BlackBoxTest {
 
   test("TestJsFunc.kt") {
-    val res =
-      """
-        |1
-        |3
-        |6
-      """.stripMargin
-    assertExecResult(res, "TestJsFunc.kt", mainClass = "TestJsFuncKt")
+    val res = consoleToString {
+      println(1)
+      println(3)
+      println(6)
+
+      def _asFloatJSNotation(d: Double): String = {
+        if (d == Float.MinValue)
+          return "-3.4028234663852886e+38"
+        else if (d == Long.MaxValue)
+          return "9223372036854776000"
+        else if (d == Long.MinValue)
+          return "-9223372036854776000"
+
+        return d.toString.replace("E", "e+")
+      }
+
+      println(_asFloatJSNotation(Double.MaxValue) + " "
+        + _asFloatJSNotation(Double.MinValue) + " "
+        + Double.PositiveInfinity + " "
+        + Double.NegativeInfinity + " "
+        + Double.NaN
+      )
+
+
+      // TODO: Check why there is more precision in the generated JS file than when using Float.MinValue
+      println(_asFloatJSNotation(Float.MaxValue) + " "
+        + _asFloatJSNotation(Float.MinValue) + " "
+        + Float.PositiveInfinity + " "
+        + Float.NegativeInfinity + " "
+        + Float.NaN + " "
+      )
+
+      println(Long.MaxValue + " "
+        + Long.MinValue
+      )
+    }
+
+    assertExecResult(res, "TestJsFunc.kt", mainClass = "kotlin.js.TestJsFuncKt")
   }
 
   test("TestAccessorsGen.kt") {

@@ -48,8 +48,22 @@ object NameEncoder {
   def encodeClassName(className: String, suffix: String): String = {
     val parts = className.split('.').toList
     val (pack, clazz) = parts.partition(_.head.isLower)
-    val name = (if (pack.nonEmpty) pack.mkString("", ".", ".") else "") +
-      (if (clazz.length > 1) clazz.mkString("$") else clazz.head)
+    val name = {
+      if (pack.nonEmpty && clazz.nonEmpty)
+        pack.mkString("", ".", ".")
+      else if (pack.nonEmpty)
+        pack.slice(0, pack.length - 1).mkString("", ".", ".")
+      else
+        ""
+    } + {
+      if (clazz.length > 1)
+        clazz.mkString("$")
+      else if (clazz.length == 1)
+        clazz.head
+      else
+        pack.last
+    }
+
     val n = if (name == "kotlin.Any") "java.lang.Object" else name
     Definitions.encodeClassName(n + suffix)
   }

@@ -11,6 +11,12 @@ import org.scalajs.core.ir.Types.{ClassType, DoubleType, FloatType}
 
 import scala.collection.JavaConverters._
 
+/**
+  * This class is only used to support Kotlin standard library compilation. The kotlin js
+  * function is not at all supported in any other way
+  * @param d
+  * @param c
+  */
 case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
     extends Gen[KtCallExpression] {
 
