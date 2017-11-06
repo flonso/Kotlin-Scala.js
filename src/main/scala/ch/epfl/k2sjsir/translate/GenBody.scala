@@ -11,7 +11,8 @@ case class GenBody(d: KtExpression)(implicit val c: TranslationContext) extends 
   override def tree: Tree = d match {
     case be: KtBlockExpression =>
       Block(be.getStatements.asScala.map(x => GenExpr(x).tree).toList)
-    case e: KtExpression => Block(GenExpr(e).tree)
+    case e: KtExpression =>
+      Block(GenExpr(e).tree)
     case _ => notImplemented()
   }
 

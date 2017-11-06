@@ -23,7 +23,8 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
   override def tree: Tree = {
     d match {
-      case ce: KtCallExpression => GenCall(ce).tree
+      case ce: KtCallExpression =>
+        GenCall(ce).tree
       case ks: KtStringTemplateExpression =>
         ks.getEntries.foldLeft(StringLiteral(""): Tree)((acc, expr) => {
           BinaryOp(BinaryOp.String_+, acc, expr match {
@@ -42,8 +43,11 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             val tpe = m.getType.toJsType
             val recv = getClassDescriptorForType(m.getDispatchReceiverParameter.getValue.getType)
             val isObj = recv.isCompanionObject || DescriptorUtils.isObject(recv)
-            if(isObj) Apply(LoadModule(recv.toJsClassType), m.getterIdent(), List())(tpe)
-            else if(DescriptorUtils.isLocal(m)) VarRef(m.toJsIdent)(recv.toJsClassType)
+
+            if(isObj)
+              Apply(LoadModule(recv.toJsClassType), m.getterIdent(), List())(tpe)
+            else if(DescriptorUtils.isLocal(m))
+              VarRef(m.toJsIdent)(recv.toJsClassType)
             else {
               val a = CallUtilKt.getResolvedCallWithAssert(d, c.bindingContext())
               a.getDispatchReceiver match {

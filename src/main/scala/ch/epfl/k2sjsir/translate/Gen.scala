@@ -21,6 +21,8 @@ trait Gen[T <: KtElement] {
     val c = getClass.getSimpleName
     val name = if (d != null) d.getClass.getSimpleName else ""
     println(s"Not supported $c: $name" + (if (!debugStr.isEmpty) s" with message $debugStr" else ""))
+
+     println("at pos : " + pos)
     Debugger()
   }
 
