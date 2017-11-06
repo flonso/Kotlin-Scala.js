@@ -3,7 +3,7 @@ package ch.epfl.k2sjsir
 import java.{util => ju}
 
 import ch.epfl.k2sjsir.lower.SJSIRLower
-import ch.epfl.k2sjsir.translate.{GenClass, GenExternalClass, GenFun}
+import ch.epfl.k2sjsir.translate.{GenClass, GenExternalClass, GenFun, GenProperty}
 import ch.epfl.k2sjsir.utils.NameEncoder
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.js.translate.utils.{AnnotationsUtils, BindingUtils}
 import org.jetbrains.kotlin.psi._
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{AnyType, ClassType, NoType}
-import org.scalajs.core.ir.{ClassKind, Position, Definitions}
+import org.scalajs.core.ir.{ClassKind, Definitions, Position}
 
 import scala.collection.JavaConversions._
 import scala.collection.immutable.{List, Nil}
@@ -38,8 +38,10 @@ final class PackageDeclarationTranslator private(
 
     for (file <- files) {
       try {
-        val topLevel = new mutable.MutableList[KtNamedFunction]()
+        val topLevelFunctions = new mutable.MutableList[KtNamedFunction]()
+        val topLevelValues = new mutable.MutableList[KtProperty]()
         val declarations = new SJSIRLower().lower(file)
+
         for (declaration <- declarations) {
           val predefinedObject = AnnotationsUtils.isPredefinedObject(BindingUtils.getDescriptorForElement(bindingContext, declaration))
           declaration match {
@@ -52,20 +54,24 @@ final class PackageDeclarationTranslator private(
               val cd = getClassDescriptor(context.bindingContext(), d)
               SJSIRCodegen.genIRFile(output, cd, tree)
             case f: KtNamedFunction =>
-              topLevel += f
-            case _ => sys.error(s"Not implemented yet: $getClass")
+              topLevelFunctions += f
+            case p: KtProperty =>
+              topLevelValues += p
+            case t => sys.error(s"Not implemented yet: ${t.getClass}")
           }
         }
-        if (topLevel.nonEmpty) {
+
+        if (topLevelFunctions.nonEmpty || topLevelValues.nonEmpty) {
           val className = JvmFileClassUtil.getFileClassInfoNoResolve(file).getFileClassFqName.asString()
           val encodedName = NameEncoder.encodeClassName(className, "")
 
           implicit val pos = Position(Position.SourceFile(file.getName), 0, 0)
 
-          val defs = topLevel.toList.map(x => GenFun(x)(context).tree)
+          val defs = topLevelFunctions.toList.map(x => GenFun(x)(context).tree)
+          val vals = topLevelValues.map(x => GenProperty(x)(context).tree)
           val ctor = MethodDef(false, Ident("init___"), Nil, NoType,
             Some(ApplyStatically(This()(ClassType(encodedName)), ClassType(Definitions.ObjectClass), Ident("init___"), Nil)(NoType)))(OptimizerHints.empty, None)
-          val ctorAndDefs = ctor :: defs
+          val ctorAndDefs = ctor :: (defs ++ vals)
 
           val hasMain = defs.exists {
             case MethodDef(_, Ident("main__AT__V", _), _, _, _) => true

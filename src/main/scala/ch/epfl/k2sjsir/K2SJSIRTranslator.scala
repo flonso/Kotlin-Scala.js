@@ -5,10 +5,12 @@ import java.util
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils.hasError
 import org.jetbrains.kotlin.js.analyze.TopDownAnalyzerFacadeForJS
 import org.jetbrains.kotlin.js.analyzer.JsAnalysisResult
-import org.jetbrains.kotlin.js.config.JsConfig
+import org.jetbrains.kotlin.js.backend.ast.{JsImportedModule, JsName}
+import org.jetbrains.kotlin.js.config.JsConfig.Reporter
+import org.jetbrains.kotlin.js.config.{JSConfigurationKeys, JsConfig}
 import org.jetbrains.kotlin.js.coroutine.CoroutineTransformer
 import org.jetbrains.kotlin.js.facade.exceptions.TranslationException
-import org.jetbrains.kotlin.js.facade.{MainCallParameters, TranslationResult}
+import org.jetbrains.kotlin.js.facade.{MainCallParameters, TranslationResult, TranslationUnit}
 import org.jetbrains.kotlin.js.inline.JsInliner
 import org.jetbrains.kotlin.js.inline.clean.{RemoveUnusedImportsKt, ResolveTemporaryNamesKt}
 import org.jetbrains.kotlin.js.translate.utils.ExpandIsCallsKt.expandIsCalls
@@ -18,40 +20,93 @@ import org.jetbrains.kotlin.psi.KtFile
 import scala.collection.JavaConverters._
 
 final class K2SJSIRTranslator(val config: JsConfig) {
-  @throws[TranslationException]
-  def translate(files: util.List[KtFile], mainCallParameters: MainCallParameters): TranslationResult =
-    translate(files, mainCallParameters, null)
+
+  val incrementalResults = config.getConfiguration.get(
+    JSConfigurationKeys.INCREMENTAL_RESULTS_CONSUMER)
 
   @throws[TranslationException]
-  def translate(files: util.List[KtFile], mainCallParameters: MainCallParameters, ar: JsAnalysisResult): TranslationResult = {
+  def translate(reporter: JsConfig.Reporter,
+                files: List[KtFile],
+                parameters: MainCallParameters): TranslationResult =
+    translate(reporter, files, parameters, ar = null)
+
+  @throws[TranslationException]
+  def translate(reporter: JsConfig.Reporter,
+                sourceFiles: List[KtFile],
+                parameters: MainCallParameters,
+                ar: JsAnalysisResult): TranslationResult = {
+
+    // TODO: Get rid of this var ?
     var analysisResult = ar
+
+    val units = sourceFiles.map(new TranslationUnit.SourceFile(_))
+
+    val files = new util.ArrayList[KtFile](sourceFiles.asJava)
+
     if (analysisResult == null) {
       analysisResult = TopDownAnalyzerFacadeForJS.analyzeFiles(files, config)
       ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
     }
+
     val bindingTrace = analysisResult.getBindingTrace
-    TopDownAnalyzerFacadeForJS.checkForErrors(JsConfig.withJsLibAdded(files, config), bindingTrace.getBindingContext)
+    TopDownAnalyzerFacadeForJS.checkForErrors(files,
+                                              bindingTrace.getBindingContext)
+
     val moduleDescriptor = analysisResult.getModuleDescriptor
+
     val diagnostics = bindingTrace.getBindingContext.getDiagnostics
-    val context = Translation.generateAst(bindingTrace, files, mainCallParameters, moduleDescriptor, config)
+
+    val translationResult = Translation.generateAst(bindingTrace, files, parameters, moduleDescriptor, config)
     ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
-    if (hasError(diagnostics)) return new TranslationResult.Fail(diagnostics)
-    val program = JsInliner.process(context)
+    if (hasError(diagnostics))
+      return new TranslationResult.Fail(diagnostics)
+
+    val newFragments = translationResult.getNewFragments
+    val allFragments = translationResult.getFragments
+
+    JsInliner.process(reporter,
+      config,
+      analysisResult.getBindingTrace,
+      translationResult.getInnerModuleName,
+      allFragments,
+      newFragments,
+      translationResult.getImportStatements
+    )
+    /*
     ResolveTemporaryNamesKt.resolveTemporaryNames(program)
+
     ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
-    if (hasError(diagnostics)) return new TranslationResult.Fail(diagnostics)
+
+    if (hasError(diagnostics))
+      return new TranslationResult.Fail(diagnostics)
+
     val coroutineTransformer = new CoroutineTransformer(program)
     coroutineTransformer.accept(program)
+
     RemoveUnusedImportsKt.removeUnusedImports(program)
+
     ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
-    if (hasError(diagnostics)) return new TranslationResult.Fail(diagnostics)
+
+    if (hasError(diagnostics))
+      return new TranslationResult.Fail(diagnostics)
+
     expandIsCalls(program, context)
+    */
+
     ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
+
     val importedModules = new util.ArrayList[String]
 
-    for (module <- context.getImportedModules.asScala) {
-      importedModules.add(module.getExternalName)
-    }
-    new TranslationResult.Success(config, files, program, diagnostics, importedModules, moduleDescriptor, bindingTrace.getBindingContext)
+    for {
+      module <- translationResult.getImportedModuleList.asScala
+    } yield importedModules.add(module.getExternalName)
+
+    new TranslationResult.Success(config,
+                                  files,
+                                  translationResult.getProgram,
+                                  diagnostics,
+                                  importedModules,
+                                  moduleDescriptor,
+                                  bindingTrace.getBindingContext)
   }
 }
