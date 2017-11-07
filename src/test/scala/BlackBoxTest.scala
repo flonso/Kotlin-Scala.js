@@ -17,8 +17,19 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
   protected val KOTLIN_HOME = scala.util.Properties.envOrElse("KOTLIN_HOME", "/usr/share/kotlin" )
 
-  private def cleanOutput(folder: File) = {
+  private def cleanOutput(folder: File): Unit = {
+    if (folder == null) {
+      println("Folder is null")
+      return
+    }
+
     val files = folder.listFiles()
+
+    if (files == null){
+      println("Files are null")
+      return
+    }
+
     files.foreach(f =>
       if (f.getName.endsWith(".sjsir") || f.getName.endsWith(".js") || f.getName.endsWith(".class")) f.delete())
   }
