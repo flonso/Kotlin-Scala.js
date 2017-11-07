@@ -112,8 +112,8 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
 
     ContentRootsKt.addKotlinSourceRoots(configuration, arguments.getFreeArgs)
     val paths: KotlinPaths =
-      if (arguments.kotlinHome != null)
-        new KotlinPathsFromHomeDir(new File(arguments.kotlinHome))
+      if (arguments.getKotlinHome != null)
+        new KotlinPathsFromHomeDir(new File(arguments.getKotlinHome))
       else PathUtil.getKotlinPathsForCompiler
     messageCollector.report(CompilerMessageSeverity.LOGGING,
                             "Using Kotlin home directory " + paths.getHomePath,
@@ -121,7 +121,7 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
 
     //FIXME: create maybe a js file from Kotlin
     configuration.put(CommonConfigurationKeys.MODULE_NAME,
-                      arguments.destination)
+                      "src/test/resources/out")
 
     val libraries = new SmartList[String]
     if (!arguments.noStdlib)
@@ -146,11 +146,13 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
     if (!checkKotlinPackageUsage(environmentForJS, sourcesFiles))
       return ExitCode.COMPILATION_ERROR
 
+    /*
     if (arguments.destination == null) {
       messageCollector.report(CompilerMessageSeverity.ERROR,
                               "Specify output directory via -d", null)
       return ExitCode.COMPILATION_ERROR
     }
+    */
 
     if (messageCollector.hasErrors) return ExitCode.COMPILATION_ERROR
 

@@ -7,22 +7,25 @@ import org.jetbrains.kotlin.cli.common.arguments._
 
 @SerialVersionUID(0L)
 class K2SJSIRCompilerArguments extends CommonCompilerArguments {
-
+  /*
   object Wrapper {
     implicit class StringWithFreezableVar[String](var str: String) extends ReadWriteProperty[Any, String] {
       override def getValue(thisRef: Any, property: KProperty[_]): String = this.str
 
       override def setValue(thisRef: Any, property: KProperty[_], value: String): Unit = {
-        this.str = str
+        this.str = value
       }
+
+      def get(): String = this.str
+      def set(value: String): Unit = this.str = value
     }
   }
+  import Wrapper._
+  */
 
   @GradleOption(classOf[DefaultValues.StringNullDefault])
   @Argument(value = "-d", description = "Destination for generated class files", valueDescription = "<directory|jar>")
-  var destination: String = ""
-
-  var destination$delegate = new FreezableVar[String](null)
+  var destination: String = _
 
   @Argument(value = "classpath", description = "Paths where to find user class files", valueDescription = "<path>")
   var classpath: String = _
@@ -55,9 +58,6 @@ class K2SJSIRCompilerArguments extends CommonCompilerArguments {
   @GradleOption(classOf[DefaultValues.BooleanTrueDefault])
   @Argument(value = "no-stdlib", description = "Don't include Kotlin runtime into classpath")
   var noStdlib: Boolean = false
-
-  @Argument(value = "kotlin-home", description = "Path to Kotlin compiler home directory, used for runtime libraries discovery", valueDescription = "<path>")
-  var kotlinHome: String = _
 
   /* Added from K2JSCompilerArguments */
 
