@@ -9,10 +9,10 @@ fun main(args: Array<String>) {
     println(a[0])
 
     val numbers = intArrayOf(1,2,3,4)
-    //*
+    /*
     val iterOnNumbers = numbers.iterator()
     while(iterOnNumbers.hasNext()) println(iterOnNumbers.next())
-    //*/
+    */
 
     val doubles = doubleArrayOf(1.2,1.2,1.3)
     /*

@@ -11,10 +11,6 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       def _asFloatJSNotation(d: Double): String = {
         if (d == Float.MinValue)
           return "-3.4028234663852886e+38"
-        else if (d == Long.MaxValue)
-          return "9223372036854776000"
-        else if (d == Long.MinValue)
-          return "-9223372036854776000"
 
         return d.toString.replace("E", "e+")
       }
@@ -35,8 +31,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         + Float.NaN + " "
       )
 
-      println(Long.MaxValue + " "
-        + Long.MinValue
+      println("9223372036854776000" + " "
+        + "-9223372036854776000"
       )
     }
 
