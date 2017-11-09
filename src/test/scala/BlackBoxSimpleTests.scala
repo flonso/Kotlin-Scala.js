@@ -386,7 +386,6 @@ class BlackBoxSimpleTests extends BlackBoxTest {
 5.5
 */
       """
-        |12
         |10.5
         |11
         |true

@@ -47,5 +47,4 @@ fun main(args: Array<String>) {
     ml.myLambdaWithParamAndNoType("I'm a lambda with no return type and string param")
     ml.myLambdaWithNoParamAndSring()
     ml.myLambdaWithParamsAndString(1, "plus 0.42 is", 1.42)
-    println(ml.oneLine(4))
 }
