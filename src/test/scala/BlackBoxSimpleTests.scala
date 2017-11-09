@@ -381,9 +381,12 @@ class BlackBoxSimpleTests extends BlackBoxTest {
 
   test("TestHighFunction.kt") {
     assertExecResult(
+/*
+12
+5.5
+*/
       """
         |12
-        |5.5
         |10.5
         |11
         |true
@@ -398,6 +401,21 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         """
           |11
         """.stripMargin, "TestLambdaTopLevel.kt", mainClass = "TestLambdaTopLevelKt")
+  }
+
+  test("TestLambda.kt") {
+    assertExecResult(
+      """
+        |I'm in the body of a local lambda expression
+        |Nothing, I'm a function
+        |Hello World
+        |2
+        |I'm a lambda defined with fun keyword
+        |I'm the body of a lambda with no param and no ret type
+        |I'm a lambda with no return type and string param
+        |I'm the body of a lambda with no param and ret type string
+        |Lambda with params and ret string : 1 plus 0.42 is 1.42
+      """.stripMargin, "TestLambda.kt", mainClass = "TestLambdaKt")
   }
 
   //  test("TestTypeCast.kt") {

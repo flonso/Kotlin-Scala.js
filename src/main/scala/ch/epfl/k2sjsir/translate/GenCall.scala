@@ -3,6 +3,7 @@ package ch.epfl.k2sjsir.translate
 import ch.epfl.k2sjsir.utils.NameEncoder
 import ch.epfl.k2sjsir.utils.NameEncoder._
 import ch.epfl.k2sjsir.utils.Utils._
+import org.jetbrains.kotlin.builtins.functions.FunctionInvokeDescriptor
 import org.jetbrains.kotlin.descriptors.{ClassConstructorDescriptor, SimpleFunctionDescriptor}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
@@ -70,7 +71,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
           else {
             val receiver = dispatchReceiver match {
               case i: ImplicitClassReceiver => This()(i.getClassDescriptor.toJsClassType)
-              case e: ExtensionReceiver => VarRef(dr.toJsIdent)(dr.getType.toJsType)
+              case _: ExtensionReceiver => VarRef(dr.toJsIdent)(dr.getType.toJsType)
               case e: ExpressionReceiver =>
                 if (isReceiverJsFunc(dispatchReceiver))
                   GenJsFunc(e.getExpression.asInstanceOf[KtCallExpression]).tree
@@ -90,7 +91,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
             else {
               val name =
                 if (desc.getName.toString == "invoke")
-                  NameEncoder.encodeApply(desc)
+                  NameEncoder.encodeApplyLambda(desc)
                 else
                   desc.toJsMethodIdent
 

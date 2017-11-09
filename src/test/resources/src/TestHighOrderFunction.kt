@@ -18,8 +18,8 @@ object Test {
 
     fun main() {
         // Test explicit invoke on function
-        println((Test::double).invoke(6))
-        println((Test::five).invoke())
+        //println((Test::double).invoke(6))
+        //println((Test::five).invoke())
 
         // Test invoke on function reference
         println(addFive(Test::five))

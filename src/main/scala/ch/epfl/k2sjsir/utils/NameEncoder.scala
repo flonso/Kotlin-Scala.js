@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyPackageDescriptor
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt.getAllSuperclassesWithoutAny
 import org.jetbrains.kotlin.resolve.source.PsiSourceFile
 import org.scalajs.core.ir.Trees._
+import org.scalajs.core.ir.Types.NoType
 import org.scalajs.core.ir.{Definitions, Position}
 
 import scala.collection.JavaConverters._
@@ -140,6 +141,18 @@ object NameEncoder {
           .map(_.toJsInternal)
           .mkString(OuterSep, OuterSep, "")
     Ident(s"apply$$mc$retType$concatType$$sp${types}__$retType")
+  }
+
+  def encodeApplyLambda(desc: CallableDescriptor)(implicit pos: Position): Ident = {
+    val retType = desc.getReturnType.toJsInternal
+
+    if (retType == "V" && desc.getValueParameters.size() == 0)
+      return encodeApply(desc)
+
+    val concatType =
+      desc.getValueParameters.asScala.map(_ => "__O").mkString("")
+
+    Ident(s"apply${concatType}__O")
   }
 
   def encodeWithSourceFile(d: DeclarationDescriptor): String = {
