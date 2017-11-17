@@ -89,13 +89,10 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
               }
             }
             else {
-              val name =
-                if (desc.getName.toString == "invoke")
-                  NameEncoder.encodeApplyLambda(desc)
-                else
-                  desc.toJsMethodIdent
-
-              Apply(receiver, name, args)(rtpe)
+              if (desc.getName.toString == "invoke")
+                JSFunctionApply(receiver, args)
+              else
+                Apply(receiver, desc.toJsMethodIdent, args)(rtpe)
             }
           }
         }

@@ -381,11 +381,9 @@ class BlackBoxSimpleTests extends BlackBoxTest {
 
   test("TestHighFunction.kt") {
     assertExecResult(
-/*
-12
-5.5
-*/
       """
+        |12
+        |5.5
         |10.5
         |11
         |true

@@ -1,4 +1,5 @@
 fun IntArray.dummy(predicate: (kotlin.Int) -> kotlin.Boolean): IntArray {
+
     println(predicate(5))
     return intArrayOf(4, 5, 6, 7)
 }
@@ -8,6 +9,7 @@ object Test {
     fun addFive(body: () -> Double ) = body() + 5
 
     fun five() = 5.5
+
     fun double(x : Int) = x * 2
 
     fun isOdd(x: Int) = x % 2 != 0
@@ -18,8 +20,8 @@ object Test {
 
     fun main() {
         // Test explicit invoke on function
-        //println((Test::double).invoke(6))
-        //println((Test::five).invoke())
+        println((Test::double).invoke(6))
+        println((Test::five).invoke())
 
         // Test invoke on function reference
         println(addFive(Test::five))

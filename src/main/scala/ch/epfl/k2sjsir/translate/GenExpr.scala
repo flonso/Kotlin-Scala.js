@@ -100,6 +100,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
               resolved.getCall.getValueArguments.asScala.map(x => GenExpr(x.getArgumentExpression).tree).toList
             val tpe = desc.getReturnType.toJsType
             val isLambdaCall = desc.getName.asString() == "invoke"
+            val isDirectInvokeCall = call.getText.matches("^invoke[(].*[)]$")
 
             val ao = if(isArray) arrayOps(receiver, tpe, desc.getName.asString(), args) else None
             ao.getOrElse({
@@ -120,14 +121,17 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                   case _ =>
                     val name = if (desc.getName.toString == "invoke") NameEncoder.encodeApplyLambda(desc) else desc.toJsMethodIdent
 
-                    if (isLambdaCall) {
+                    if (isLambdaCall && !isDirectInvokeCall) {
                       val lambdaFuncName = """((.+)\(.*\))""".r.replaceAllIn(call.getText, "$2")
-                      val lambdaType = ClassType(s"sjsr_AnonFunction${args.size}")
-                      val lambdaName = Ident(s"${lambdaFuncName}__F${args.size}")
-                      Apply(Apply(receiver, lambdaName, Nil)(lambdaType), name, args.toList)(tpe)
+                      val sjsJsFunction = s"sjs_js_Function${args.size}"
+                      val lambdaType = ClassType(sjsJsFunction)
+                      val lambdaName = Ident(s"${lambdaFuncName}__$sjsJsFunction")
+                      JSFunctionApply(Apply(receiver, lambdaName, Nil)(lambdaType), args)
                     }
+                    else if (isLambdaCall && isDirectInvokeCall)
+                      JSFunctionApply(receiver, args)
                     else
-                      Apply(receiver, name, args.toList)(tpe)
+                      Apply(receiver, name, args)(tpe)
                 }
               }
             })
@@ -202,15 +206,16 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
   }
 
   private def genLambda(l: KtLambdaExpression) : Tree = {
-    val funCtx = l.getContext
+    val lambdaContext = l.getContext
     val params =
-      if (funCtx.isInstanceOf[KtNamedFunction])
-        Some(funCtx.asInstanceOf[KtNamedFunction].getValueParameters.asScala.toList)
+      if (lambdaContext.isInstanceOf[KtNamedFunction])
+        Some(lambdaContext.asInstanceOf[KtNamedFunction].getValueParameters.asScala.toList)
       else
         None
 
     val body = GenBody(l.getBodyExpression).treeOption
     val desc = BindingUtils.getFunctionDescriptor(c.bindingContext(), l.getFunctionLiteral)
+
     genClosure(desc, body, params)
   }
 
@@ -248,7 +253,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case None => Closure(List(), closureParams, b, List())
     }
 
-    New(ClassType(s"sjsr_AnonFunction${closureParams.size}"), Ident(s"init___sjs_js_Function${closureParams.size}"), List(closure))
+    closure
   }
 
   def treeOption: Option[Tree] = if (d == null) None else Some(tree)

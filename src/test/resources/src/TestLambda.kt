@@ -39,7 +39,6 @@ fun main(args: Array<String>) {
     }
 
     myLocalLambda()
-
     val ml = TestClass()
     ml.myFun()
     ml.funWithEqualSign(2)("Hello World")

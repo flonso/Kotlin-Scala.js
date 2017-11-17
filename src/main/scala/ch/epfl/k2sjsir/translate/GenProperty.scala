@@ -1,5 +1,6 @@
 package ch.epfl.k2sjsir.translate
 
+import ch.epfl.k2sjsir.utils.Utils
 import ch.epfl.k2sjsir.utils.Utils._
 import com.intellij.util.execution.ParametersListUtil
 import org.jetbrains.kotlin.descriptors.{PropertyGetterDescriptor, PropertySetterDescriptor}
@@ -9,9 +10,10 @@ import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 import org.jetbrains.kotlin.psi.{KtProperty, KtPropertyAccessor, KtPsiUtil}
 import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils}
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
+import org.jetbrains.kotlin.types.KotlinType
 import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{AnyType, NoType}
+import org.scalajs.core.ir.Types.{AnyType, ClassType, Type}
 
 case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extends Gen[KtProperty] {
 
@@ -19,10 +21,14 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
 
   val desc = BindingUtils.getPropertyDescriptor(c.bindingContext(), d)
 
+
   override def tree: Tree = {
     val idt = desc.toJsIdent
     val static = DescriptorUtils.isStaticDeclaration(desc)
-    FieldDef(static, idt, desc.getType.toJsType, desc.isVar)
+
+    val tpe = getLambdaTypeIfNecessary(desc.getType)
+
+    FieldDef(static, idt, tpe, desc.isVar)
   }
 
   def withGetterAndSetter: Seq[Tree] = {
@@ -32,17 +38,19 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
       else
         Nil
 
-    t ++ {
+    val g =
       if (d.getGetter == null || !d.getGetter.hasBody)
         Option(desc.getGetter).map(getter)
       else
         Option(d.getGetter).map(getter)
-    }.toList ++ {
+
+    val s =
       if (d.getSetter == null || !d.getSetter.hasBody)
         Option(desc.getSetter).map(setter)
       else
         Option(d.getSetter).map(setter)
-    }.toList
+
+    t ++ g.toList ++ s.toList
   }
 
 }
@@ -68,12 +76,22 @@ object GenProperty {
   private[translate] def getter(f: PropertyGetterDescriptor)(implicit pos: Position): Tree = {
 
     val property = f.getCorrespondingProperty
-    val rtpe = property.getReturnType.toJsType
+    val methodIdent =
+      if (isLambdaType(property.getReturnType)) {
+        val rtpeName = Utils.getName(property.getReturnType)
+        val suffix = rtpeName.replace("kotlin.Function", "")
+
+        Ident(s"${property.getName}__sjs_js_Function$suffix")
+      }
+      else
+        f.toJsMethodIdent
+
+    val rtpe = getLambdaTypeIfNecessary(property.getReturnType)
     val tpe = getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
 
     val body = Select(This()(tpe), property.toJsIdent)(rtpe)
 
-    MethodDef(static = false, f.toJsMethodIdent, List(), rtpe, Some(body))(OptimizerHints.empty, None)
+    MethodDef(static = false, methodIdent, List(), rtpe, Some(body))(OptimizerHints.empty, None)
   }
 
   /**
@@ -118,6 +136,17 @@ object GenProperty {
     val params = List(ParamDef(Ident("set"), rtpe, mutable = false, rest = false))
     val body = Some(Assign(Select(This()(tpe), property.toJsIdent)(rtpe), VarRef(Ident("set"))(rtpe)))
     MethodDef(static = false, f.toJsMethodIdent, params, rtpe, body)(OptimizerHints.empty, None)
+  }
+
+  private def isLambdaType(tpe: KotlinType): Boolean = {
+    tpe.toString.matches("Function[0-9]+.*")
+  }
+
+  private def getLambdaTypeIfNecessary(tpe: KotlinType): Type = {
+    if (isLambdaType(tpe))
+      AnyType
+    else
+      tpe.toJsType
   }
 
 }
