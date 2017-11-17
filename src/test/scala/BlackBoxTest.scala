@@ -48,7 +48,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
   protected def assertExecResult(expected: String, srcFile: String, outFile: String = "out.js", mainClass: String = "Test") = {
     new K2SJSIRCompiler()
       .exec(System.err,
-        Array(s"$ROOT_SOURCE/$srcFile", "-Xallow-kotlin-package",/* "-d", ROOT_OUT,*/ "-kotlin-home", KOTLIN_HOME):_*)
+        Array(s"$ROOT_SOURCE/$srcFile", "-Xallow-kotlin-package", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME):_*)
 
     Scalajsld.run(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
 

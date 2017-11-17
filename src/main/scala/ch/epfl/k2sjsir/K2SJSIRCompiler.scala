@@ -43,8 +43,6 @@ import org.jetbrains.kotlin.serialization.js.ModuleKind
 import org.jetbrains.kotlin.utils._
 import scala.collection.JavaConverters._
 
-import ch.epfl.k2sjsir.codegen._
-
 object K2SJSIRCompiler {
 
   def main(args: Array[String]): Unit = doMain(new K2SJSIRCompiler, args)
@@ -88,12 +86,12 @@ object K2SJSIRCompiler {
 
 }
 
-class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
+class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArgs] {
 
-  override protected def createArguments = new K2SJSIRCompilerArguments()
+  override protected def createArguments = new K2SJSIRCompilerArgs()
 
   override protected def doExecute(
-      arguments: K2SJSIRCompilerArguments,
+      arguments: K2SJSIRCompilerArgs,
       configuration: CompilerConfiguration,
       rootDisposable: Disposable,
       paths: KotlinPaths
@@ -121,7 +119,7 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
 
     //FIXME: create maybe a js file from Kotlin
     configuration.put(CommonConfigurationKeys.MODULE_NAME,
-                      "src/test/resources/out")
+      arguments.destination)
 
     val libraries = new SmartList[String]
     if (!arguments.noStdlib)
@@ -146,13 +144,11 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
     if (!checkKotlinPackageUsage(environmentForJS, sourcesFiles))
       return ExitCode.COMPILATION_ERROR
 
-    /*
     if (arguments.destination == null) {
       messageCollector.report(CompilerMessageSeverity.ERROR,
                               "Specify output directory via -d", null)
       return ExitCode.COMPILATION_ERROR
     }
-    */
 
     if (messageCollector.hasErrors) return ExitCode.COMPILATION_ERROR
 
@@ -225,7 +221,7 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
 
   override def setupPlatformSpecificArgumentsAndServices(
       configuration: CompilerConfiguration,
-      arguments: K2SJSIRCompilerArguments,
+      arguments: K2SJSIRCompilerArgs,
       services: Services): Unit = {
     configuration.put[jl.Boolean](JSConfigurationKeys.SOURCE_MAP, true)
     configuration.put(JSConfigurationKeys.TARGET, EcmaVersion.defaultVersion)
