@@ -36,7 +36,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       )
     }
 
-    assertExecResult(res, "TestJsFunc.kt", mainClass = "kotlin.js.TestJsFuncKt")
+    assertExecResult(res, Seq("TestJsFunc.kt"), mainClass = "kotlin.js.TestJsFuncKt")
   }
 
   test("TestAccessorsGen.kt") {
@@ -80,7 +80,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       printlnJSFormat(a.tmp)
     }
 
-    assertExecResult(res, "TestAccessorsGen.kt", mainClass = "TestAccessorsGenKt")
+    assertExecResult(res, Seq("TestAccessorsGen.kt"), mainClass = "TestAccessorsGenKt")
   }
 
   // TODO: Complete this test
@@ -104,7 +104,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       printlnJSFormat(a.equals(b))
       printlnJSFormat(a.equals(c))
     }
-    assertExecResult(res, "TestThisKeyword.kt", mainClass = "TestThisKeywordKt")
+    assertExecResult(res, Seq("TestThisKeyword.kt"), mainClass = "TestThisKeywordKt")
   }
 
   test("TestIsOperator.kt") {
@@ -134,7 +134,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |Base with p = 4 is not Derived class
       """.stripMargin
 
-    assertExecResult(expectedResult, "TestIsOperator.kt", mainClass = "TestIsOperatorKt")
+    assertExecResult(expectedResult, Seq("TestIsOperator.kt"), mainClass = "TestIsOperatorKt")
   }
 
   // FIXME: println Float and Double with decimal points
@@ -191,11 +191,11 @@ class BlackBoxSimpleTests extends BlackBoxTest {
     """.stripMargin
     }
 
-    assertExecResult(expectedResult, "TestMethodsBaseTypes.kt", mainClass = "TestMethodsBaseTypesKt")
+    assertExecResult(expectedResult, Seq("TestMethodsBaseTypes.kt"), mainClass = "TestMethodsBaseTypesKt")
   }
 
   test("TestSimplePrint.kt") {
-    assertExecResult("1", "TestSimplePrint.kt", mainClass = "TestSimplePrintKt")
+    assertExecResult("1", Seq("TestSimplePrint.kt"), mainClass = "TestSimplePrintKt")
   }
 
   test("TestBinaryOps.kt") {
@@ -269,7 +269,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
 
       println(e + f)
     }
-    assertExecResult(scalaResult, "TestBinaryOps.kt", mainClass = "TestBinaryOpsKt")
+    assertExecResult(scalaResult, Seq("TestBinaryOps.kt"), mainClass = "TestBinaryOpsKt")
   }
 
   test("TestMultipleConstructors.kt") {
@@ -282,7 +282,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |7
         |b 6
         |5
-      """.stripMargin, "TestMultipleConstructors.kt", mainClass = "TestMultipleConstructorsKt")
+      """.stripMargin, Seq("TestMultipleConstructors.kt"), mainClass = "TestMultipleConstructorsKt")
   }
 
   test("TestEqualities.kt") {
@@ -306,7 +306,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       println("a" == "b")
       println("a" == "a")
     }
-    assertExecResult(result, "TestEqualities.kt", mainClass = "TestEqualitiesKt")
+    assertExecResult(result, Seq("TestEqualities.kt"), mainClass = "TestEqualitiesKt")
   }
 
   test("TestIf.kt") {
@@ -317,7 +317,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |1
         |1
         |1
-      """.stripMargin, "TestIf.kt", mainClass = "TestIfKt")
+      """.stripMargin, Seq("TestIf.kt"), mainClass = "TestIfKt")
   }
 
   //  test("TestNullable.kt") {
@@ -334,7 +334,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
   test("TestTryCatch.kt") {
     assertExecResult(
       """Exception caught
-        |Reached finally""".stripMargin, "TestTryCatch.kt", mainClass = "TestTryCatchKt")
+        |Reached finally""".stripMargin, Seq("TestTryCatch.kt"), mainClass = "TestTryCatchKt")
   }
 
   test("TestClassExtension.kt") {
@@ -344,27 +344,27 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |32
         |D.bar
         |C.baz
-      """.stripMargin, "TestClassExtension.kt", mainClass = "TestClassExtensionKt")
+      """.stripMargin, Seq("TestClassExtension.kt"), mainClass = "TestClassExtensionKt")
   }
 
   test("TestTopClassExtension.kt") {
     assertExecResult(
       """
         |10
-      """.stripMargin, "TestTopClassExtension.kt", mainClass = "TestTopClassExtensionKt")
+      """.stripMargin, Seq("TestTopClassExtension.kt"), mainClass = "TestTopClassExtensionKt")
   }
 
   test("TestStringConcat.kt") {
-    assertExecResult("5 Hello World", "TestStringConcat.kt", mainClass = "TestStringConcatKt")
+    assertExecResult("5 Hello World", Seq("TestStringConcat.kt"), mainClass = "TestStringConcatKt")
   }
 
   test("TestAnonClass.kt") {
-      assertExecResult("Hello World", "TestAnonClass.kt", mainClass = "TestAnonClassKt")
+      assertExecResult("Hello World", Seq("TestAnonClass.kt"), mainClass = "TestAnonClassKt")
   }
 
 
   test("TestGenParentConstructor.kt") {
-    assertExecResult("5 1", "TestGenParentConstructor.kt", mainClass = "TestGenParentConstructorKt")
+    assertExecResult("5 1", Seq("TestGenParentConstructor.kt"), mainClass = "TestGenParentConstructorKt")
   }
 
   test("TestAssignationOrder.kt") {
@@ -376,7 +376,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |false
         |5
         |11
-      """.stripMargin, "TestAssignationOrder.kt", mainClass = "TestAssignationOrderKt")
+      """.stripMargin, Seq("TestAssignationOrder.kt"), mainClass = "TestAssignationOrderKt")
   }
 
   test("TestHighFunction.kt") {
@@ -390,14 +390,14 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |4
         |21
         |1
-      """.stripMargin, "TestHighOrderFunction.kt", mainClass = "TestHighOrderFunctionKt")
+      """.stripMargin, Seq("TestHighOrderFunction.kt"), mainClass = "TestHighOrderFunctionKt")
   }
 
     test("TestLambdaTopLevel.kt") {
       assertExecResult(
         """
           |11
-        """.stripMargin, "TestLambdaTopLevel.kt", mainClass = "TestLambdaTopLevelKt")
+        """.stripMargin, Seq("TestLambdaTopLevel.kt"), mainClass = "TestLambdaTopLevelKt")
   }
 
   test("TestLambda.kt") {
@@ -412,7 +412,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |I'm a lambda with no return type and string param
         |I'm the body of a lambda with no param and ret type string
         |Lambda with params and ret string : 1 plus 0.42 is 1.42
-      """.stripMargin, "TestLambda.kt", mainClass = "TestLambdaKt")
+      """.stripMargin, Seq("TestLambda.kt"), mainClass = "TestLambdaKt")
   }
 
   //  test("TestTypeCast.kt") {
@@ -432,7 +432,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
 
       println(3)
     }
-    assertExecResult(result, "TestArraysBase.kt", mainClass = "TestArraysBaseKt")
+    assertExecResult(result, Seq("TestArraysBase.kt"), mainClass = "TestArraysBaseKt")
   }
 
   /*
@@ -455,21 +455,24 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |60
         |60
         |6
-      """.stripMargin, "TestVarIncrease.kt", mainClass = "TestVarIncreaseKt")
+      """.stripMargin, Seq("TestVarIncrease.kt"), mainClass = "TestVarIncreaseKt")
   }
 
 
 
   test("TestDynamic.kt") {
-    assertExecResult("2", "TestDynamic.kt", mainClass = "TestDynamicKt")
+    assertExecResult("2", Seq("TestDynamic.kt"), mainClass = "TestDynamicKt")
   }
 
   test("TestTopLevelCalls.kt") {
     assertExecResult(
       """
+        |Hey
+        |Hello World
+        |Hello Toto
         |Hello World
         |Hello Kotlin
-      """.stripMargin, "TestTopLevelCalls.kt", mainClass = "TestTopLevelCallsKt")
+      """.stripMargin, Seq("TestTopLevelCalls.kt", "TopLevelFunctions.kt"), mainClass = "TestTopLevelCallsKt")
   }
 
 }

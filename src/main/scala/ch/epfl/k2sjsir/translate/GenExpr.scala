@@ -108,10 +108,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                 val op = GenUnary.convertToOp(receiver.tpe, tpe, receiver)
 
                 op.getOrElse(notImplemented(s"missing UnaryOp from ${receiver.tpe} to $tpe"))
-              }/*
-              else if (DescriptorUtils.isTopLevelDeclaration(desc)) {
-                notImplemented("TopLevel calls not supported yet")
-              }*/
+              }
               else if (DescriptorUtils.isExtension(desc))
                 GenCall(call).genExtensionCall(receiver)
               else {

@@ -1,14 +1,18 @@
 
-fun welcome(other: String) = println("Hello $other")
 fun hello() : Unit = println("Hello World")
 
 class TopLevelCaller {
-    fun call() = {
+    fun call() {
         println("Hey")
+        hello()
+        welcome("Toto")
     }
 }
 
 fun main(args: Array<String>) {
+    val c = TopLevelCaller()
+    c.call()
+
     hello()
     welcome("Kotlin")
 }

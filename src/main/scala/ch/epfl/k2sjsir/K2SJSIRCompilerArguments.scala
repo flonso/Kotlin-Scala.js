@@ -7,21 +7,6 @@ import org.jetbrains.kotlin.cli.common.arguments._
 
 @SerialVersionUID(0L)
 class K2SJSIRCompilerArguments extends CommonCompilerArguments {
-  /*
-  object Wrapper {
-    implicit class StringWithFreezableVar[String](var str: String) extends ReadWriteProperty[Any, String] {
-      override def getValue(thisRef: Any, property: KProperty[_]): String = this.str
-
-      override def setValue(thisRef: Any, property: KProperty[_], value: String): Unit = {
-        this.str = value
-      }
-
-      def get(): String = this.str
-      def set(value: String): Unit = this.str = value
-    }
-  }
-  import Wrapper._
-  */
 
   @GradleOption(classOf[DefaultValues.StringNullDefault])
   @Argument(value = "-d", description = "Destination for generated class files", valueDescription = "<directory|jar>")
