@@ -76,15 +76,7 @@ object GenProperty {
   private[translate] def getter(f: PropertyGetterDescriptor)(implicit pos: Position): Tree = {
 
     val property = f.getCorrespondingProperty
-    val methodIdent =
-      if (isLambdaType(property.getReturnType)) {
-        val rtpeName = Utils.getName(property.getReturnType)
-        val suffix = rtpeName.replace("kotlin.Function", "")
-
-        Ident(s"${property.getName}__sjs_js_Function$suffix")
-      }
-      else
-        f.toJsMethodIdent
+    val methodIdent = f.toJsMethodIdent
 
     val rtpe = getLambdaTypeIfNecessary(property.getReturnType)
     val tpe = getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType

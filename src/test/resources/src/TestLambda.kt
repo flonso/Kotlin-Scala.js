@@ -22,10 +22,23 @@ class TestClass {
 
     fun oneLine(x: Int) = x * 2
 
+    fun oneLine2(x: Int) : Int {
+        return x * 2
+    }
+
     fun funWithEqualSign(b: Int): (String) -> Unit = { a ->
         println(a)
         println(b)
         println("I'm a lambda defined with fun keyword")
+    }
+
+    fun funWithEqSign2(b: Int): (String) -> Unit {
+        return {
+            a ->
+            println(a)
+            println(b)
+            println("blah")
+        }
     }
 
     fun myFun() {

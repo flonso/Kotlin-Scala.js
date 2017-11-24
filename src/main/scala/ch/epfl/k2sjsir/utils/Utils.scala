@@ -87,8 +87,9 @@ object Utils {
   }
 
   private def getFunctionType(name: String): ReferenceType = {
+    // FIXME: Keep kotlin.Function when stdlib is working
     val suffix = name.replace("kotlin.Function", "")
-    ClassType(s"F$suffix")
+    ClassType(s"sjs_js_Function$suffix")
   }
 
   private def getClassType(tpe: KotlinType): ClassType =
@@ -141,6 +142,8 @@ object Utils {
     case DoubleType => "D"
     case StringType => "T"
     case ArrayType(elem, _) => "A" + encodeName(elem)
+    // FIXME: Remove this after kotlin-stdlib is compiled correctly
+    case ClassType(name) if name.matches("kotlin.Function*") => name.replace("kotlin.Function", "sjs_js_Function")
     case ClassType(name) => name
     case NothingType => Definitions.RuntimeNothingClass
     case NullType => Definitions.RuntimeNullClass

@@ -92,55 +92,24 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         val receiver = GenExpr(k.getReceiverExpression).tree
         val selector = k.getSelectorExpression
         val isArray = receiver.tpe.isInstanceOf[ArrayType]
+
         selector match {
           case call: KtCallExpression =>
-            val resolved = CallUtilKt.getResolvedCall(call, c.bindingContext())
-            val desc = resolved.getResultingDescriptor
-            val args =
-              resolved.getCall.getValueArguments.asScala.map(x => GenExpr(x.getArgumentExpression).tree).toList
-            val tpe = desc.getReturnType.toJsType
-            val isLambdaCall = desc.getName.asString() == "invoke"
-            val isDirectInvokeCall = call.getText.matches("^invoke[(].*[)]$")
-
-            val ao = if(isArray) arrayOps(receiver, tpe, desc.getName.asString(), args) else None
-            ao.getOrElse({
-              if (GenUnary.isUnaryOp(desc.getName.asString())) {
-                val op = GenUnary.convertToOp(receiver.tpe, tpe, receiver)
-
-                op.getOrElse(notImplemented(s"missing UnaryOp from ${receiver.tpe} to $tpe"))
-              }
-              else if (DescriptorUtils.isExtension(desc))
-                GenCall(call).genExtensionCall(receiver)
-              else {
-                receiver match {
-                  case _: LoadJSModule | _: JSNew =>
-                    JSBracketMethodApply(receiver, StringLiteral(desc.getName.asString()), args)
-                  case _ =>
-                    val name = if (desc.getName.toString == "invoke") NameEncoder.encodeApplyLambda(desc) else desc.toJsMethodIdent
-
-                    if (isLambdaCall && !isDirectInvokeCall) {
-                      val lambdaFuncName = """((.+)\(.*\))""".r.replaceAllIn(call.getText, "$2")
-                      val sjsJsFunction = s"sjs_js_Function${args.size}"
-                      val lambdaType = ClassType(sjsJsFunction)
-                      val lambdaName = Ident(s"${lambdaFuncName}__$sjsJsFunction")
-                      JSFunctionApply(Apply(receiver, lambdaName, Nil)(lambdaType), args)
-                    }
-                    else if (isLambdaCall && isDirectInvokeCall)
-                      JSFunctionApply(receiver, args)
-                    else
-                      Apply(receiver, name, args)(tpe)
-                }
-              }
-            })
+            val rcvExpr = Option(k.getReceiverExpression)
+            GenCall(call).withReceiver(rcvExpr)
           case kn: KtNameReferenceExpression =>
             val tpe = c.bindingContext().getType(kn).toJsType
             val ao = if(isArray) arrayOps(receiver, tpe, kn.getReferencedName, List()) else None
-            ao.getOrElse({
-              BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
-                case m: PropertyDescriptor => Apply(receiver, m.getterIdent(), List())(tpe)
-                case _ => notImplemented("after KtDotQualifiedExpression > KtNameReferenceExpression")
-              }
-            })
+            ao.getOrElse(
+              // GenExpr(kn).tree
+              //*
+              {
+                BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
+                  case m: PropertyDescriptor => Apply(receiver, m.getterIdent(), List())(tpe)
+                  case _ => notImplemented("after KtDotQualifiedExpression > KtNameReferenceExpression")
+                }
+              }//*/
+            )
           case _ =>
             notImplemented("after KtDotQualifiedExpression (default case)")
         }
