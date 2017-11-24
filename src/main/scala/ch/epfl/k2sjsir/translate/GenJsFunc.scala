@@ -43,16 +43,8 @@ case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
               List())(descriptor.getReturnType.toJsType)
       case "Number.MIN_VALUE" =>
         findClosestTypeRef(d) match {
-          case Some(n) =>
-            val rcv = LoadModule(ClassType("s_"+ n +"$"))
-            val method = Ident(s"MinValue__${n.charAt(0)}")
-            val rtpe =
-              if (n == "Double")
-                DoubleType
-            else
-                FloatType
-
-            Apply(rcv, method, Nil)(rtpe)
+          case Some("Double") => DoubleLiteral(Double.MinPositiveValue)
+          case Some("Float") => FloatLiteral(Float.MinPositiveValue)
           case _ => notImplemented("Number.MIN_VALUE should only be used for Float or Double")
         }
       case "Number.MAX_VALUE" =>

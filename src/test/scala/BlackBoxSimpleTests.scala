@@ -8,24 +8,19 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       println(3)
       println(6)
 
-      def _asFloatJSNotation(d: Double): String = {
-        if (d == Float.MinValue)
-          return "-3.4028234663852886e+38"
-
-        return d.toString.replace("E", "e+")
+      def _asJsNotation(d: Double): String = {
+        return d.toString.replace("E", "e+").replace("+-", "-")
       }
 
-      println(_asFloatJSNotation(Double.MaxValue) + " "
-        + _asFloatJSNotation(Double.MinValue) + " "
+      println(_asJsNotation(Double.MaxValue) + " "
+        + "5e-324" + " "
         + Double.PositiveInfinity + " "
         + Double.NegativeInfinity + " "
         + Double.NaN
       )
 
-
-      // TODO: Check why there is more precision in the generated JS file than when using Float.MinValue
-      println(_asFloatJSNotation(Float.MaxValue) + " "
-        + _asFloatJSNotation(Float.MinValue) + " "
+      println(_asJsNotation(Float.MaxValue) + " "
+        + _asJsNotation(Float.MinPositiveValue) + " "
         + Float.PositiveInfinity + " "
         + Float.NegativeInfinity + " "
         + Float.NaN + " "
