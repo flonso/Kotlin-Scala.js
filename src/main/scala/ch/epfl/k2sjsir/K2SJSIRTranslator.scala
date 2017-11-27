@@ -36,17 +36,17 @@ final class K2SJSIRTranslator(val config: JsConfig) {
                 parameters: MainCallParameters,
                 ar: JsAnalysisResult): TranslationResult = {
 
-    // TODO: Get rid of this var ?
-    var analysisResult = ar
-
     val units = sourceFiles.map(new TranslationUnit.SourceFile(_))
 
     val files = new util.ArrayList[KtFile](sourceFiles.asJava)
 
-    if (analysisResult == null) {
-      analysisResult = TopDownAnalyzerFacadeForJS.analyzeFiles(files, config)
-      ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
-    }
+    val analysisResult =
+      if (ar == null)
+        TopDownAnalyzerFacadeForJS.analyzeFiles(files, config)
+      else
+        ar
+
+    ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
 
     val bindingTrace = analysisResult.getBindingTrace
     TopDownAnalyzerFacadeForJS.checkForErrors(files,

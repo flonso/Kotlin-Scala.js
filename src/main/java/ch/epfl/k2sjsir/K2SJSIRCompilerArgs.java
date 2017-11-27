@@ -4,10 +4,17 @@ import org.jetbrains.kotlin.cli.common.arguments.Argument;
 import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments;
 import org.jetbrains.kotlin.cli.common.arguments.DefaultValues;
 import org.jetbrains.kotlin.cli.common.arguments.GradleOption;
+import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
+import org.jetbrains.kotlin.resolve.diagnostics.Diagnostics;
 
 import static org.jetbrains.kotlin.cli.common.arguments.K2JsArgumentConstants.MODULE_PLAIN;
 
 public class K2SJSIRCompilerArgs extends CommonCompilerArguments {
+
+    public static Boolean dirtyCallToCompanion(Diagnostics diagnostics, MessageCollector messageCollector) {
+        return AnalyzerWithCompilerReport.Companion.reportDiagnostics(diagnostics, messageCollector);
+    }
 
     @GradleOption(DefaultValues.StringNullDefault.class)
     @Argument(value = "-d", description = "Destination for generated class files", valueDescription = "<directory|jar>")
