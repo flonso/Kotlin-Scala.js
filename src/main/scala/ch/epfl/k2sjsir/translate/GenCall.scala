@@ -202,6 +202,8 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
     }
   }
 
+  def genCallToInterface() = ???
+
   private def isTopLevelFunction(sf: SimpleFunctionDescriptor) =
     sf.getExtensionReceiverParameter == null && sf.getContainingDeclaration.getName.asString() == "<root>"
 

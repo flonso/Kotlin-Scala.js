@@ -19,36 +19,26 @@ package ch.epfl.k2sjsir
  */
 
 import java.io.File
+import java.net.URLClassLoader
 import java.{lang => jl, util => ju}
 
-import com.intellij.openapi.Disposable
-import com.intellij.openapi.util.io.FileUtil
-import com.intellij.util.containers.ContainerUtil
-import com.intellij.util.{Function, SmartList}
+import org.jetbrains.kotlin.com.intellij.openapi.Disposable
+import org.jetbrains.kotlin.com.intellij.openapi.util.io.FileUtil
+import org.jetbrains.kotlin.com.intellij.util.containers.ContainerUtil
+import org.jetbrains.kotlin.com.intellij.util.{Function, SmartList}
 import kotlin.jvm.functions.Function1
 import org.jetbrains.kotlin.cli.common.CLITool.doMain
 import org.jetbrains.kotlin.cli.common.ExitCode.{COMPILATION_ERROR, OK}
 import org.jetbrains.kotlin.cli.common.UtilsKt.checkKotlinPackageUsage
 import org.jetbrains.kotlin.cli.common.arguments.K2JsArgumentConstants
 import org.jetbrains.kotlin.cli.common.messages._
-import org.jetbrains.kotlin.cli.common.{
-  CLICompiler,
-  CLIConfigurationKeys,
-  ExitCode
-}
-import org.jetbrains.kotlin.cli.jvm.compiler.{
-  EnvironmentConfigFiles,
-  KotlinCoreEnvironment
-}
+import org.jetbrains.kotlin.cli.common.{CLICompiler, CLIConfigurationKeys, ExitCode}
+import org.jetbrains.kotlin.cli.jvm.compiler.{EnvironmentConfigFiles, KotlinCoreEnvironment}
 import org.jetbrains.kotlin.cli.jvm.plugins.PluginCliParser
 import org.jetbrains.kotlin.config._
 import org.jetbrains.kotlin.js.analyze.TopDownAnalyzerFacadeForJS
 import org.jetbrains.kotlin.js.analyzer.JsAnalysisResult
-import org.jetbrains.kotlin.js.config.{
-  EcmaVersion,
-  JSConfigurationKeys,
-  JsConfig
-}
+import org.jetbrains.kotlin.js.config.{EcmaVersion, JSConfigurationKeys, JsConfig}
 import org.jetbrains.kotlin.js.facade.{MainCallParameters, TranslationResult}
 import org.jetbrains.kotlin.progress.ProgressIndicatorAndCompilationCanceledStatus
 import org.jetbrains.kotlin.psi.KtFile

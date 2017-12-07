@@ -42,9 +42,9 @@ object NameEncoder {
     if (isKeyword(n) || n(0).isDigit || n(0) == '$') "$" + n else n
   }
 
-  private[utils] def encodeClassFullNameIdent(d: ClassDescriptor)(
+  private[utils] def encodeClassFullNameIdent(d: ClassDescriptor, kotlinNaming: Boolean = false)(
       implicit pos: Position): Ident =
-    Ident(encodeClassFullName(d), Some(d.getName.asString()))
+    Ident(encodeClassFullName(d, kotlinNaming), Some(d.getName.asString()))
 
   def encodeClassName(className: String, suffix: String): String = {
     val parts = className.split('.').toList
@@ -69,8 +69,13 @@ object NameEncoder {
     Definitions.encodeClassName(n + suffix)
   }
 
-  private[utils] def encodeClassFullName(d: ClassDescriptor): String = {
-    val suffix = if (isCompanionObject(d) || isObject(d)) "$" else ""
+  private[utils] def encodeClassFullName(d: ClassDescriptor, kotlinNaming: Boolean = false): String = {
+    val suffix = {
+      if (isCompanionObject(d) || isObject(d)) "$"
+      else if (kotlinNaming && isInterface(d)) "$DefaultImpls"
+      else ""
+    }
+
     val className = getFqName(d).asString()
     encodeClassName(className, suffix)
   }
@@ -83,13 +88,14 @@ object NameEncoder {
   private[utils] def encodeMethodName(
       d: CallableDescriptor,
       reflProxy: Boolean = false)(implicit pos: Position): String =
-    encodeMethodNameInternal(d, reflProxy).mkString
+    encodeMethodNameInternal(d, reflProxy, false).mkString
 
   private def encodeMethodNameInternal(
       d: CallableDescriptor,
       reflProxy: Boolean = false,
       inRTClass: Boolean = false)(implicit pos: Position): Seq[String] = {
-    val name = encodeMemberNameInternal(d.getName.asString())
+    val stringName = d.getName.asString()
+    val name = encodeMemberNameInternal(stringName)
     def privateSuffix(cl: Option[ClassDescriptor]) = cl.fold("") { c =>
       if (c.getKind == INTERFACE && !c.isImpl) encodeClassFullName(c)
       else

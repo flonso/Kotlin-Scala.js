@@ -9,7 +9,13 @@ case class GenDeclaration(d: KtDeclaration)(implicit val c: TranslationContext) 
   override def tree: Tree = d match {
     case f: KtNamedFunction => GenFun(f).tree
     case p: KtProperty => GenProperty(p).tree
-    case _ => notImplemented()
+    case _ => notImplemented("Default case on tree")
+  }
+
+  def withAbstractBodies = d match {
+    case f: KtNamedFunction => GenFun(f).withAbstractBody
+    case _: KtProperty => notImplemented("Unsupported abstract property")
+    case _ => notImplemented("Default case on tree")
   }
 
 }

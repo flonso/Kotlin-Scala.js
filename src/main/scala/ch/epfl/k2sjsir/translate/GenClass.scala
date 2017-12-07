@@ -1,38 +1,105 @@
 package ch.epfl.k2sjsir.translate
 
+import ch.epfl.k2sjsir.SJSIRCodegen
+import ch.epfl.k2sjsir.lower.SJSIRLower
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.descriptors.ClassKind.OBJECT
-import org.jetbrains.kotlin.descriptors.{ClassConstructorDescriptor, ClassDescriptor, PropertyDescriptor}
-import org.jetbrains.kotlin.js.translate.utils.PsiUtils.getPrimaryConstructorParameters
+import org.jetbrains.kotlin.codegen.CodegenUtilKt
+import org.jetbrains.kotlin.com.intellij.openapi.util.io.FileUtil
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
+import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils._
+import org.jetbrains.kotlin.js.translate.utils.PsiUtils.getPrimaryConstructorParameters
+import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.psi._
-import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils, FunctionDescriptorUtil}
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt._
-import org.scalajs.core.ir.ClassKind
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{AnyType, ClassType, NoType}
+import org.scalajs.core.ir.Types.{ClassType, NoType}
+import org.scalajs.core.ir.{ClassKind, Trees}
 
 import scala.collection.JavaConverters._
-import scala.collection.immutable.{List, Nil}
+import scala.collection.immutable.List
+import scala.collection.mutable.ListBuffer
 
 case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) extends Gen[KtClassOrObject] {
 
   private val desc = getClassDescriptor(c.bindingContext(), d)
   private val optimizerHints = OptimizerHints.empty
-  private val superClass = getSuperClassOrAny(desc)
+  private val kind = desc.toJsClassKind
+  private val superClass = if(isInterface) None else Some(getSuperClassOrAny(desc))
   private val interfaces = getSuperInterfaces(desc).asScala
 
+  // Body abstract = none
+  // Interface superclass = none
+  // Interface interfaces = list !
   override def tree: ClassDef = {
     val idt = desc.toJsClassIdent
-    val kind = if (isModule(desc)) ClassKind.ModuleClass else ClassKind.Class
     val jsNativeLoadSpec = None
 
-    val defs : List[Tree] = d.getDeclarations.asScala.collect {
+    /*
+    For interfaces :
+      => there are no constructors, we therefore need to generate a DefaultImpl file which will
+      contain all default implementations provided in the interface.
+      These implementation take a class instance as parameter
+
+    - Generate the complete class abstracted
+    - Generate all implementations in separate file containing
+      - static declarations of the implementations
+      - first parameter should be instance of the interface
+      - calls to this keyword matching the interface should be replaced by this instance
+      - naming convention : <interface_name>$DefaultImpls
+
+    For classes implementing interfaces :
+    - Generate all overriden methods and variables as usual
+    - Generate missing methods (from interfaces) by calling the default implementation of the interfaces
+
+     */
+    val defaultImpls = new ListBuffer[KtDeclaration]
+
+    // Store declarations contained in the interfaces
+    val inheritedDeclarations = interfaces.flatMap {
+      i => {
+        val file = DescriptorToSourceUtils.getContainingFile(i)
+        val declarations = new SJSIRLower().lower(file)
+
+        declarations.collect {
+          case d: KtClassOrObject =>
+            val desc = BindingUtils.getClassDescriptor(c.bindingContext(), d)
+            if (desc.toJsClassIdent == i.toJsClassIdent)
+              d.getDeclarations.asScala
+            else
+              Seq()
+        }.flatten
+      }
+    }
+
+    val overrideKeyword = KtModifierKeywordToken.keywordModifier("override")
+    val classDeclarations = d.getDeclarations.asScala
+    val overridenDeclarations = classDeclarations.filter { x =>
+      val modifiers = x.getModifierList
+      modifiers != null && modifiers.hasModifier(overrideKeyword)
+    }
+    val nonOverridenDeclarations = inheritedDeclarations.filter {
+      dcl =>
+        overridenDeclarations.contains(dcl)
+    }
+
+    // TODO: Add missing declarations to the list of definitions
+
+    val defs : List[Tree] = classDeclarations.collect {
       case p : KtProperty =>
-        GenProperty(p).withGetterAndSetter
+        val prop = GenProperty(p)
+        if (isInterface) {
+          if (prop.hasDefinedAccessors)
+            defaultImpls += p
+
+          prop.withAbstractGetterAndSetter
+        }
+        else
+          prop.withGetterAndSetter
       case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
         /**
           * This is a special case, all those element are either used in the constructor (for property init) or
@@ -40,24 +107,72 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
           * Nested classes are handle with lowering, but they remain as declaration in the top class
           */
         List()
-      case decl => Seq(GenDeclaration(decl).tree)
+      case decl =>
+        val genDecl = GenDeclaration(decl)
+
+        if (isInterface) {
+          decl match {
+            case nf: KtNamedFunction if nf.hasBody => defaultImpls += decl
+            case _ => // Do nothing
+          }
+
+          Seq(genDecl.withAbstractBodies)
+        }
+        else
+          Seq(genDecl.tree)
     }.flatten.toList
+
+    val inheritedDefs = nonOverridenDeclarations.collect {
+      case nf: KtNamedFunction if !isInterface =>
+        /*
+         def myInterfaceMethodName(this, myInterfaceMethodArgs) {
+          MyInterface$DefaultImpls.myInterfaceMethodName(this, args)
+         }
+         */
+        val methodDef = GenDeclaration(nf).tree match {
+          case md@MethodDef(static, name, argsParamDef, resultType, _) =>
+            val newBody = {
+              val funDesc = BindingUtils.getFunctionDescriptor(c.bindingContext(), nf)
+              val cls = DescriptorUtils.getContainingClass(funDesc).toJsDefaultImplType
+              val methodIdent = funDesc.toJsMethodIdent
+              val self = This()(cls)
+              val args = self :: argsParamDef.map(_.ref)
+              ApplyStatic(cls, methodIdent, args)(md.resultType)
+            }
+
+            MethodDef(static, name, argsParamDef, resultType, Option(newBody))(OptimizerHints.empty, None)
+        }
+
+        methodDef
+    }
 
     /**
       * By default constructor parameters are local to constructor, if they are marked as val we need to create a
       * property to export them to the rest of the class
       */
-    val paramsInit = getPrimaryConstructorParameters(d)
-      .asScala
-      .map(getPropertyDescriptorForConstructorParameter(c.bindingContext(), _))
-      .filter(_ != null)
-      .flatMap(p => {
-        val name =  p.toJsIdent
-        val tpe = p.getType.toJsType
-        FieldDef(static = false, name, tpe, mutable = p.getSetter != null)  ::
-          Option(p.getGetter).map(get => GenProperty.getter(get)).toList ++
-          Option(p.getSetter). map(set => GenProperty.setter(set)).toList
-      }).toList
+    val paramsInit = d.getPrimaryConstructorParameters.asScala.flatMap { param =>
+      val propDesc = getPropertyDescriptorForConstructorParameter(c.bindingContext(), param)
+
+      if (propDesc == null)
+        Seq()
+      else {
+        val isMutable = propDesc.getSetter != null
+
+        if (propDesc != null) {
+          val name = propDesc.toJsIdent
+          val tpe = propDesc.getType.toJsType
+
+          val fd = Seq(FieldDef(static = false, name, tpe, mutable = isMutable))
+          val g = Seq(GenProperty.getter(propDesc))
+          val s = if (isMutable) Seq(GenProperty.setter(propDesc)) else Seq()
+
+          fd ++ g ++ s
+
+        } else {
+          Seq()
+        }
+      }
+    }.toList
 
     val hasMain = defs.exists {
       case MethodDef(_, Ident("main__V", _), _, _, _) => true
@@ -66,10 +181,15 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
 
     val constructors = genConstructors
     val allDefs = paramsInit ++ defs.toList ++ constructors
-    ClassDef(idt, kind, Some(superClass.toJsClassIdent), interfaces.map(_.toJsClassIdent).toList, jsNativeLoadSpec, allDefs)(optimizerHints)
-  }
 
-  private def isModule(c: ClassDescriptor): Boolean = c.getKind == OBJECT
+    val sprCls = superClass.fold(None: Option[Trees.Ident])(x => Some(x.toJsClassIdent))
+
+    val defaultImplsClass = genDefaultImpls(defaultImpls.toList)
+
+    val classDef = ClassDef(idt, kind, sprCls, interfaces.map(_.toJsClassIdent).toList, jsNativeLoadSpec, allDefs)(optimizerHints)
+
+    classDef
+  }
 
   private def genConstructors : Seq[Tree] = {
     val constructors = d.getSecondaryConstructors.asScala.map(genSecondaryConstructor).toList
@@ -112,14 +232,18 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
         Assign(Select(This()(desc.toJsClassType), name)(tpe), VarRef(name)(tpe))
       }).toList
 
-    val declsInit = d.getDeclarations.asScala.collect {
-      case p: KtProperty if p.getAccessors.isEmpty || p.isVar =>
-        val expr = GenExpr(p.getDelegateExpressionOrInitializer).tree
+    val declsInit: List[Tree] = d.getDeclarations.asScala
+        .collect {
+          case p: KtProperty if p.hasDelegateExpressionOrInitializer =>
+            val initExpr = p.getDelegateExpressionOrInitializer
+            val expr = GenExpr(initExpr).tree
 
-        Assign(Select(This()(desc.toJsClassType), Ident(p.getName))(expr.tpe), expr)
-      case i: KtClassInitializer =>
-        GenBody(i.getBody).tree
+            Assign(Select(This()(desc.toJsClassType), Ident(p.getName))(expr.tpe), expr)
+          case i: KtClassInitializer =>
 
+            GenBody(i.getBody).tree
+          case d: KtProperty =>
+            notImplemented(d.getName + "(no init expr)")
     }.toList
 
     val superCall = Option(getSuperCall(c.bindingContext(), d)) match {
@@ -127,7 +251,7 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
         val name =  call.getResultingDescriptor.asInstanceOf[ClassConstructorDescriptor].toJsMethodIdent
         val params = call.getValueArgumentsByIndex.asScala
           .map(x => GenExpr(x.getArguments.get(0).getArgumentExpression).tree) //TODO: why list of ValueArgument
-        val tpe = superClass.toJsClassType
+        val tpe = superClass.get.toJsClassType // TODO: Can it be None in interface ?
         ApplyStatically(This()(tpe), tpe, name, params.toList)(NoType)
       case None => // We have no superclass, hence we need to call init on Object
         val o = ClassType("O")
@@ -141,5 +265,29 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       val stats = Block(superCall :: paramsInit ++ declsInit)
       Some(MethodDef(static = false, primary.toJsMethodIdent, args, NoType, Some(stats))(optimizerHints, None))
     } else None
+  }
+
+  def genDefaultImpls(impls: List[KtDeclaration]): Seq[ClassDef] = {
+    if (impls.isEmpty) return Seq()
+
+    val kind = ClassKind.Class
+    val name = desc.toJsDefaultImplIdent
+    val superClass = None
+    val defs = impls.collect {
+      case p: KtProperty => GenProperty(p).withGetterAndSetter
+      case decl => Seq(GenDeclaration(decl).tree)
+    }.flatten
+
+    val classDef = ClassDef(name, kind, superClass, List(), None, defs)(OptimizerHints.empty)
+
+    val n = name.name.drop(1).replace("_", "/")
+    val output = c.getConfig.getConfiguration.get(CommonConfigurationKeys.MODULE_NAME)
+    SJSIRCodegen.genIRFile(output, n, classDef)
+
+    Seq(classDef)
+  }
+
+  private def isInterface: Boolean = {
+    ClassKind.Interface == kind
   }
 }

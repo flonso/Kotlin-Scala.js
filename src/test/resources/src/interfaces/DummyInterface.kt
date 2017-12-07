@@ -1,0 +1,6 @@
+
+interface DummyInterface {
+    fun dummyFun() {
+
+    }
+}

@@ -1,7 +1,7 @@
 package ch.epfl.k2sjsir.translate
 
 import ch.epfl.k2sjsir.utils.Utils._
-import com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.psi.{KtCallExpression, KtStringTemplateExpression, KtTypeReference}
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt

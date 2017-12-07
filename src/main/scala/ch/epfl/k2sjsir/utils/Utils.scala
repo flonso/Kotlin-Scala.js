@@ -7,6 +7,8 @@ import org.jetbrains.kotlin.types.{KotlinType, TypeUtils}
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{Definitions, Position, Types}
+import org.scalajs.core.ir.ClassKind
+import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
 
 import scala.collection.JavaConverters._
 
@@ -29,7 +31,13 @@ object Utils {
 
     def toJsClassIdent(implicit pos: Position): Ident = encodeClassFullNameIdent(d)
 
+    def toJsDefaultImplIdent(implicit pos: Position): Ident = encodeClassFullNameIdent(d, kotlinNaming = true)
+
     def toJsClassType: ClassType = ClassType(d.toJsClassName)
+
+    def toJsDefaultImplType(implicit pos: Position): ClassType = ClassType(d.toJsDefaultImplIdent.name)
+
+    def toJsClassKind: ClassKind = getClassKind(d.getKind)
   }
 
   implicit class ParameterTranslator(d: ParameterDescriptor) {
@@ -95,6 +103,10 @@ object Utils {
   private def getClassType(tpe: KotlinType): ClassType =
     ClassType(encodeClassName(getName(tpe), ""))
 
+  private def getClassKind(kind: KtClassKind): ClassKind = {
+    classKinds(kind)
+  }
+
   private def getArrayType(tpe: KotlinType): ArrayType = {
     val name = getName(tpe)
     val args = tpe.getArguments.asScala.map(_.getType)
@@ -127,9 +139,15 @@ object Utils {
     "kotlin.Long" -> LongType,
     "kotlin.Double" -> DoubleType,
     "kotlin.Null" -> NullType,
-    "kotlin.String" -> StringType,
+    "kotlin.String" -> ClassType(Definitions.StringClass),
     "kotlin.Throwable" -> AnyType,
     "kotlin.Comparable" -> AnyType
+  )
+
+  private val classKinds = Map(
+    KtClassKind.CLASS -> ClassKind.Class,
+    KtClassKind.INTERFACE -> ClassKind.Interface,
+    KtClassKind.OBJECT -> ClassKind.ModuleClass
   )
 
   private def toInternal(t: Type): String = t match {

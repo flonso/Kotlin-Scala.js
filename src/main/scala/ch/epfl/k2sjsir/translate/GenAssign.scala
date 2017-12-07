@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
-import org.jetbrains.kotlin.resolve.scopes.receivers.{ClassValueReceiver, ExpressionReceiver}
+import org.jetbrains.kotlin.resolve.scopes.receivers.{ClassValueReceiver, ExpressionReceiver, ImplicitClassReceiver, ThisClassReceiver}
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.NoType
 
@@ -27,7 +27,7 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
     if (isReferenceToBackingFieldFromConstructor(left, c)) {
       val simpleName: KtSimpleNameExpression = getSimpleName(left)
       val a = BackingFieldAccessTranslator.newInstance(simpleName, c)
-      notImplemented()
+      notImplemented("when generating backing field from constructor")
     }
     else {
       AccessTranslationUtils.getAccessTranslator(left, c) match {
@@ -36,9 +36,10 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
           call.getResultingDescriptor match {
             case p: PropertyDescriptor =>
               val receiver = call.getDispatchReceiver match {
+                case cl: ThisClassReceiver => This()(cl.getType.toJsType)
                 case cl: ClassValueReceiver => GenExpr(cl.getExpression).tree
                 case e: ExpressionReceiver => GenExpr(e.getExpression).tree
-                case _ => notImplemented()
+                case _ => notImplemented("Unhandled receiver type (from PropertyDescriptor)")
               }
               d.getOperationToken match {
                 case KtTokens.PLUSEQ | KtTokens.MINUSEQ | KtTokens.MULTEQ | KtTokens.DIVEQ | KtTokens.PERCEQ =>
@@ -77,7 +78,7 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
           }
 
           Assign(backingField, right)
-        case t => notImplemented(t.toString)
+        case t => notImplemented(s"After acces translator (${t.toString})")
       }
     }
   }

@@ -1,6 +1,6 @@
 package ch.epfl.k2sjsir.translate
 
-import com.intellij.psi.tree.IElementType
+import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.{KtPostfixExpression, KtPrefixExpression, KtUnaryExpression}
@@ -57,7 +57,10 @@ object GenUnary {
     case LongType => LongLiteral(v.toLong)
     case DoubleType => DoubleLiteral(v.toDouble)
     case FloatType => FloatLiteral(v.toFloat)
-    case _ => Debugger()
+    case _ =>
+      val position = Option(pos).getOrElse(Position.NoPosition)
+      println(s"getLiteral : v = $v and type = $tpe at pos $position")
+      Debugger()
   }
 
   /* Useful for explicit type conversion (toInt, toDouble, ...) */
