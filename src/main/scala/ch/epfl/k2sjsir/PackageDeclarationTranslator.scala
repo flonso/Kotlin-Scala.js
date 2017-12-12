@@ -4,7 +4,7 @@ import java.{util => ju}
 
 import ch.epfl.k2sjsir.lower.SJSIRLower
 import ch.epfl.k2sjsir.translate.{GenClass, GenExternalClass, GenFun, GenProperty}
-import ch.epfl.k2sjsir.utils.NameEncoder
+import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
 import org.jetbrains.kotlin.backend.jvm.lower.InterfaceLowering
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.js.translate.utils.BindingUtils._
 import org.jetbrains.kotlin.js.translate.utils.{AnnotationsUtils, BindingUtils}
 import org.jetbrains.kotlin.psi._
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{AnyType, ArrayType, ClassType, NoType}
+import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{ClassKind, Definitions, Position}
 
 import scala.collection.JavaConversions._
@@ -71,8 +71,9 @@ final class PackageDeclarationTranslator private(
 
           val defs = topLevelFunctions.toList.map(x => GenFun(x)(context).tree)
           val vals = topLevelValues.map(x => GenProperty(x)(context).tree)
+          val receiver = Utils.genThisFromContext(ClassType(encodedName))
           val ctor = MethodDef(false, Ident("init___"), Nil, NoType,
-            Some(ApplyStatically(This()(ClassType(encodedName)), ClassType(Definitions.ObjectClass), Ident("init___"), Nil)(NoType)))(OptimizerHints.empty, None)
+            Some(ApplyStatically(receiver, ClassType(Definitions.ObjectClass), Ident("init___"), Nil)(NoType)))(OptimizerHints.empty, None)
           val ctorAndDefs = ctor :: (defs ++ vals)
 
           val hasMain = defs.exists {
@@ -82,22 +83,24 @@ final class PackageDeclarationTranslator private(
 
 
 
-          def manualExports(): List[Tree] = {
-            val args = List(ArrayValue(ArrayType(ClassType(Definitions.StringClass)), Nil))
+          def manualExports(): List[MemberDef] = {
+            val args = List(ArrayValue(ArrayType(ArrayTypeRef.of(ClassRef(Definitions.StringClass))), Nil))
             val body = Block(ApplyStatic(ClassType(encodedName), Ident("main__AT__V", Some("main"))(pos), args)(NoType)(pos), Undefined()(pos))(pos)
             val main = MethodDef(static = false, StringLiteral("main")(pos), Nil, AnyType, Some(body))(OptimizerHints.empty, None)(pos)
-            val mod = ModuleExportDef(className)(pos)
-            List(main, mod)
+            List(main)
           }
 
           val cls =
             ClassDef(
               Ident(encodedName)(pos),
               ClassKind.ModuleClass,
+              None,
               Some(Ident("O")(pos)),
               List(),
               None,
-              ctorAndDefs ++ (if (hasMain) manualExports() else Nil))(OptimizerHints.empty)(pos)
+              None,
+              ctorAndDefs ++ (if (hasMain) manualExports() else Nil),
+              List(TopLevelModuleExportDef(className)(pos)))(OptimizerHints.empty)(pos)
 
           val name = encodedName.drop(1).replace("_", "/")
           SJSIRCodegen.genIRFile(output, name, cls)

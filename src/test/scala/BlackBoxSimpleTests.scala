@@ -9,6 +9,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |You pet your dog !
         |Barking !
         |Your dog is moving his tail in happiness
+        |And some more prints
         |(a = 0 b = Hello World c = Some value dog = Dog(Lassie))
         |(a = 0 b = Hello World c = Hey there. dog = Dog(Lassie))
         |10 is a great number
@@ -41,8 +42,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         + Float.NaN + " "
       )
 
-      println("9223372036854776000" + " "
-        + "-9223372036854776000"
+      println("9223372036854775807" + " "
+        + "-9223372036854775808"
       )
     }
 

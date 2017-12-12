@@ -63,49 +63,4 @@ object GenUnary {
       Debugger()
   }
 
-  /* Useful for explicit type conversion (toInt, toDouble, ...) */
-  def convertToOp(from: Type, to: Type): Option[UnaryOp.Code] = (from, to) match {
-    // Some(-1) represents non necessary conversion (due to primitive types design in scalajs)
-    case (IntType, LongType) => Some(UnaryOp.IntToLong)
-    case (IntType, FloatType) => Some(UnaryOp.DoubleToFloat)
-    case (IntType, DoubleType) => Some(-1)
-    case (IntType, IntType) => Some(-1) // For toByte | toShort. As for 1.0.0-M1, Byte | Short is Int in Scalajs
-    case (LongType, IntType) => Some(UnaryOp.LongToInt)
-    case (LongType, DoubleType) => Some(UnaryOp.LongToDouble)
-    case (DoubleType, IntType) => Some(UnaryOp.DoubleToInt)
-    case (DoubleType, FloatType) => Some(UnaryOp.DoubleToFloat)
-    case (DoubleType, LongType) => Some(UnaryOp.DoubleToLong)
-    case (BooleanType, BooleanType) => Some(UnaryOp.Boolean_!)
-    case _ => None
-  }
-
-  def convertToOp(from: Type, to: Type, receiver: Tree)(implicit pos: Position): Option[Tree] = (from, to) match {
-    // From Int|Short|Byte to any other
-    case (IntType, LongType) => Some(UnaryOp(UnaryOp.IntToLong, receiver))
-    case (IntType, FloatType) => Some(UnaryOp(UnaryOp.DoubleToFloat, receiver))
-    case (IntType, DoubleType) => Some(receiver)
-    case (IntType, IntType) => Some(receiver) // For toByte | toShort. As for 1.0.0-M1, Byte | Short is Int in Scalajs
-    // From Long to any other
-    case (LongType, IntType) => Some(UnaryOp(UnaryOp.LongToInt, receiver))
-    case (LongType, DoubleType) => Some(UnaryOp(UnaryOp.LongToDouble, receiver))
-    case (LongType, FloatType) => Some(UnaryOp(UnaryOp.DoubleToFloat, UnaryOp(UnaryOp.LongToDouble, receiver))) // .toDouble.toFloat
-    // From Double to any other
-    case (DoubleType, IntType) => Some(UnaryOp(UnaryOp.DoubleToInt, receiver))
-    case (DoubleType, FloatType) => Some(UnaryOp(UnaryOp.DoubleToFloat, receiver))
-    case (DoubleType, LongType) => Some(UnaryOp(UnaryOp.DoubleToLong, receiver))
-    // From Float to any other
-    // FIXME: Check if this is the correct way for Floats
-    case (FloatType, IntType) => Some(receiver)
-    case (FloatType, LongType) => Some(receiver)
-    case (FloatType, DoubleType) => Some(receiver)
-    // From Boolean to any other
-    case (BooleanType, BooleanType) => Some(UnaryOp(UnaryOp.Boolean_!, receiver))
-    case _ => None
-  }
-
-  def isUnaryOp(n: String): Boolean =
-    n == "toByte" || n == "toShort" || n == "toLong" || n == "toInt" || n == "toDouble" || n == "toFloat" || n == "not" || isUnaryToBinary(n)
-
-  private def isUnaryToBinary(n: String) = n == "unaryMinus"
-
 }

@@ -8,28 +8,27 @@ import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 import org.jetbrains.kotlin.psi.{KtProperty, KtPropertyAccessor}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
-import org.jetbrains.kotlin.types.KotlinType
 import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{AnyType, NoType, Type}
+import org.scalajs.core.ir.Types.{AnyType, NoType, StringType, Type}
 
-case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extends Gen[KtProperty] {
+case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extends IRNodeGen[KtProperty, FieldDef] {
 
   import GenProperty._
 
   val desc = BindingUtils.getPropertyDescriptor(c.bindingContext(), d)
 
 
-  override def tree: Tree = {
+  override def tree: FieldDef = {
     val idt = desc.toJsIdent
     val static = DescriptorUtils.isStaticDeclaration(desc)
 
-    val tpe = getLambdaTypeIfNecessary(desc.getType)
+    val tpe = desc.getType.toJsType
 
     FieldDef(static, idt, tpe, desc.isVar)
   }
 
-  def withGetterAndSetter: Seq[Tree] = {
+  def withGetterAndSetter: Seq[MemberDef] = {
     val t = {
       if (d.isVar || d.hasInitializer)
         Seq(tree)
@@ -40,15 +39,15 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
     t ++ genGetterAndSetter(isAbstract = false)
   }
 
-  def withOnlyGetterAndSetter: Seq[Tree] = {
+  def withOnlyGetterAndSetter: Seq[MethodDef] = {
     genGetterAndSetter(isAbstract = false)
   }
 
-  def withAbstractGetterAndSetter: Seq[Tree] = {
+  def withAbstractGetterAndSetter: Seq[MethodDef] = {
     genGetterAndSetter(isAbstract = true)
   }
 
-  private def genGetterAndSetter(isAbstract: Boolean): Seq[Tree] = {
+  private def genGetterAndSetter(isAbstract: Boolean): Seq[MethodDef] = {
     /*
     1. Do not generate a FieldDef if there is no body (this has to be done inside the implementing class)
     2. Generate in every case an (abstract) getter (and an (abstract) setter if it's a var)
@@ -79,7 +78,7 @@ object GenProperty {
     *  get() = "some value for name"
     *
     */
-  private def getter(p: KtProperty, isAbstract: Boolean = false)(implicit c: TranslationContext, pos: Position): Tree = {
+  private def getter(p: KtProperty, isAbstract: Boolean = false)(implicit c: TranslationContext, pos: Position): MethodDef = {
     val propAccessor = p.getGetter
     val desc = BindingUtils.getPropertyDescriptor(c.bindingContext(), p)
     val propGetterDesc = desc.getGetter
@@ -87,17 +86,17 @@ object GenProperty {
     getter(propAccessor, desc, propGetterDesc, isAbstract)
   }
 
-  private[translate] def getter(desc: PropertyDescriptor)(implicit c: TranslationContext, pos: Position): Tree = {
+  private[translate] def getter(desc: PropertyDescriptor)(implicit c: TranslationContext, pos: Position): MethodDef = {
     val propertyAccessor = null
     val propertyGetterDescriptor = desc.getGetter
 
     getter(propertyAccessor, desc, propertyGetterDescriptor, false)
   }
 
-  private def getter(propAccessor: KtPropertyAccessor, desc: PropertyDescriptor, propGetterDesc: PropertyGetterDescriptor, isAbstract: Boolean)(implicit c: TranslationContext, pos: Position): Tree = {
+  private def getter(propAccessor: KtPropertyAccessor, desc: PropertyDescriptor, propGetterDesc: PropertyGetterDescriptor, isAbstract: Boolean)(implicit c: TranslationContext, pos: Position): MethodDef = {
     assert(propGetterDesc != null)
 
-    val rtpe = getLambdaTypeIfNecessary(desc.getReturnType)
+    val rtpe = desc.getReturnType.toJsType
     val tpe = desc.getDispatchReceiverParameter.getType
     val cd = DescriptorUtils.getClassDescriptorForType(tpe)
     val methodIdent = propGetterDesc.toJsMethodIdent
@@ -105,13 +104,12 @@ object GenProperty {
 
     val body = {
       if (!isAbstract) {
+
         if (propAccessor != null && propAccessor.hasBody)
           Option(GenBody(propAccessor.getBodyExpression).tree)
-        else {
-          val clsTpe = cd.toJsClassType
+        else
+          Option(genSelectForAccessor(desc))
 
-          Option(Select(This()(clsTpe), desc.toJsIdent)(rtpe))
-        }
       } else {
         None
       }
@@ -119,7 +117,7 @@ object GenProperty {
 
     // FIXME: Dirty hack to pass instance of interface to the default implementation
     val args = {
-      if (cd.getKind == ClassKind.INTERFACE)
+      if (isInterface(cd))
         List(ParamDef(Ident("$this"), cd.toJsClassType, false, false))
       else
         List()
@@ -139,7 +137,7 @@ object GenProperty {
     *       field = 0
     *   }
     */
-  private def setter(p: KtProperty, isAbstract: Boolean = false)(implicit c: TranslationContext, pos: Position): Tree = {
+  private def setter(p: KtProperty, isAbstract: Boolean = false)(implicit c: TranslationContext, pos: Position): MethodDef = {
     val propAccessor = p.getSetter
     val desc = BindingUtils.getPropertyDescriptor(c.bindingContext(), p)
     val propSetterDesc = desc.getSetter
@@ -147,17 +145,18 @@ object GenProperty {
     setter(propAccessor, desc, propSetterDesc, isAbstract)
   }
 
-  private[translate] def setter(desc: PropertyDescriptor)(implicit c: TranslationContext, pos: Position): Tree = {
+  private[translate] def setter(desc: PropertyDescriptor)(implicit c: TranslationContext, pos: Position): MethodDef = {
     val propertyAccessor = null
     val propertySetterDescriptor = desc.getSetter
 
     setter(propertyAccessor, desc, propertySetterDescriptor, false)
   }
 
-  private def setter(propAccessor: KtPropertyAccessor, desc: PropertyDescriptor, propGetterDesc: PropertySetterDescriptor, isAbstract: Boolean)(implicit c: TranslationContext, pos: Position): Tree = {
+  private def setter(propAccessor: KtPropertyAccessor, desc: PropertyDescriptor, propGetterDesc: PropertySetterDescriptor, isAbstract: Boolean)(implicit c: TranslationContext, pos: Position): MethodDef = {
     assert(propGetterDesc != null)
 
     val rtpe = NoType // Kotlin setters always return Unit
+    val propTpe = desc.getType.toJsType
     val methodIdent = propGetterDesc.toJsMethodIdent
     val setterIdent = Ident(s"value")
     val params = List(ParamDef(setterIdent, desc.getType.toJsType, mutable = false, rest = false))
@@ -166,10 +165,8 @@ object GenProperty {
         if (propAccessor != null && propAccessor.hasBody)
           Option(GenBody(propAccessor.getBodyExpression).tree)
         else {
-          val tpe = desc.getDispatchReceiverParameter.getType
-          val clsTpe = DescriptorUtils.getClassDescriptorForType(tpe).toJsClassType
-
-          Some(Assign(Select(This()(clsTpe), desc.toJsIdent)(rtpe), VarRef(setterIdent)(rtpe)))
+          // TODO: Define a method that generates the Select based on the desc
+          Some(Assign(genSelectForAccessor(desc), VarRef(setterIdent)(propTpe)))
         }
       } else {
         None
@@ -183,21 +180,20 @@ object GenProperty {
   /**
    * Generate default getter
    */
-  private[translate] def getter(f: PropertyGetterDescriptor)(implicit pos: Position): Tree = {
+  private[translate] def getter(f: PropertyGetterDescriptor)(implicit pos: Position): MethodDef = {
 
-    val property = f.getCorrespondingProperty
+    val propDesc = f.getCorrespondingProperty
     val methodIdent = f.toJsMethodIdent
 
-    val rtpe = getLambdaTypeIfNecessary(property.getReturnType)
-    val tpe = getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
+    val rtpe = propDesc.getReturnType.toJsType
+    val tpe = getClassDescriptorForType(propDesc.getDispatchReceiverParameter.getType).toJsClassType
 
-    val body = Select(This()(tpe), property.toJsIdent)(rtpe)
+    val body = genSelectForAccessor(propDesc)
 
     MethodDef(static = false, methodIdent, List(), rtpe, Some(body))(OptimizerHints.empty, None)
   }
 
-  // TODO: Handle the case of lambda expressions
-  private[translate] def setter(f: KtPropertyAccessor)(implicit c: TranslationContext, pos: Position): Tree = {
+  private[translate] def setter(f: KtPropertyAccessor)(implicit c: TranslationContext, pos: Position): MethodDef = {
     val body = GenBody(f.getBodyExpression).tree
     val ident = BindingUtils.getPropertyDescriptor(c.bindingContext(), f.getProperty)
     val rtpe = body.tpe
@@ -207,8 +203,6 @@ object GenProperty {
         ParamDef(Ident(p.getText), ident.getType.toJsType, mutable = false, rest = false)
     ).toList
 
-    //val params = List(ParamDef(Ident("set"), rtpe, mutable = false, rest = false))
-    //val body = Some(Assign(Select(This()(tpe), property.toJsIdent)(rtpe), VarRef(Ident("set"))(rtpe)))
     MethodDef(static = false, ident.getSetter.toJsMethodIdent, params, rtpe, Some(body))(OptimizerHints.empty, None)
   }
 
@@ -216,26 +210,24 @@ object GenProperty {
   /**
    * Generate default setter
    */
-  private[translate] def setter(f: PropertySetterDescriptor)(implicit pos: Position): Tree = {
-    val property = f.getCorrespondingProperty
+  private[translate] def setter(f: PropertySetterDescriptor)(implicit pos: Position): MethodDef = {
+    val propDesc = f.getCorrespondingProperty
 
-    val tpe = getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
-    val rtpe = property.getReturnType.toJsType
+    val tpe = getClassDescriptorForType(propDesc.getDispatchReceiverParameter.getType).toJsClassType
+    val rtpe = propDesc.getReturnType.toJsType
 
     val params = List(ParamDef(Ident("value"), rtpe, mutable = false, rest = false))
-    val body = Some(Assign(Select(This()(tpe), property.toJsIdent)(rtpe), VarRef(Ident("value"))(rtpe)))
+    val body = Some(Assign(genSelectForAccessor(propDesc), VarRef(Ident("value"))(rtpe)))
     MethodDef(static = false, f.toJsMethodIdent, params, rtpe, body)(OptimizerHints.empty, None)
   }
 
-  private def isLambdaType(tpe: KotlinType): Boolean = {
-    tpe.toString.matches("Function[0-9]+.*")
-  }
+  private def genSelectForAccessor(desc: PropertyDescriptor)(implicit pos: Position): Select = {
 
-  private def getLambdaTypeIfNecessary(tpe: KotlinType): Type = {
-    if (isLambdaType(tpe))
-      AnyType
-    else
-      tpe.toJsType
-  }
+    val tpe = desc.getDispatchReceiverParameter.getType
+    val clsTpe = DescriptorUtils.getClassDescriptorForType(tpe).toJsClassType
+    val slctTpe = desc.getType.toJsType
+    val rcv = genThisFromContext(clsTpe, desc)
 
+    Select(rcv, desc.toJsIdent)(slctTpe)
+  }
 }

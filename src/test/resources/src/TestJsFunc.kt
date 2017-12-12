@@ -11,7 +11,7 @@ fun main(args: Array<String>) {
 class MyClassForJsFunc {
     fun dummy() {
         /*
-        // This won't work, since we use a matching on the string itself
+        // This won't work, since we use a matching on the string itself :
         val str = "Kotlin.identityHashCode"
         js(str)(this)
         */

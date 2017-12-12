@@ -24,12 +24,14 @@ case class GenFor(d: KtForExpression)(implicit val c: TranslationContext) extend
     if (KotlinBuiltIns.isArray(rangeType) || KotlinBuiltIns.isPrimitiveArray(rangeType)) {
       val range = GenExpr(d.getLoopRange).tree
       val v: Value = i => value(ArraySelect(range, i)(tpe))
-      genFor(BinaryOp.Num_<, IntLiteral(0), ArrayLength(range), IntLiteral(1), v)
+      // Replace this with BinaryOp.Int_< ?
+      genFor(BinaryOp.Int_<, IntLiteral(0), ArrayLength(range), IntLiteral(1), v)
     } else if (isForOverRangeLiteral(rangeType)) {
       val range = d.getLoopRange.asInstanceOf[KtBinaryExpression]
       val start = GenExpr(range.getLeft).tree
       val end = GenExpr(range.getRight).tree
-      genFor(BinaryOp.Num_<=, start, end, IntLiteral(1), value)
+      // Replace this with BinaryOp.Int_<= ?
+      genFor(BinaryOp.Int_<=, start, end, IntLiteral(1), value)
     } else if (isForOverRange(rangeType)) {
       notImplemented()
     } else notImplemented()

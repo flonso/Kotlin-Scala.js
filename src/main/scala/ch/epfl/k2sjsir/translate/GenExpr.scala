@@ -2,8 +2,8 @@ package ch.epfl.k2sjsir.translate
 
 import ch.epfl.k2sjsir.utils.NameEncoder
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.descriptors.impl.{LocalVariableDescriptor, PropertyDescriptorImpl}
 import org.jetbrains.kotlin.descriptors._
+import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi._
@@ -12,7 +12,6 @@ import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyClassDescriptor
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver}
 import org.jetbrains.kotlin.resolve.{BindingContext, DescriptorUtils}
-import org.jetbrains.kotlin.types.DynamicTypesKt
 import org.scalajs.core.ir.Trees
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{ArrayType, ClassType, Type}
@@ -36,7 +35,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case kp: KtProperty =>
         val expr = GenExpr(kp.getDelegateExpressionOrInitializer).tree
         val desc = c.bindingContext().get(BindingContext.VARIABLE, kp)
-        VarDef(desc.toJsIdent, expr.tpe, kp.isVar, expr)
+        VarDef(desc.toJsIdent, desc.getType.toJsType, kp.isVar, expr)
       case kn: KtNameReferenceExpression =>
         BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
           case m: PropertyDescriptor =>
@@ -57,9 +56,15 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                       .getOrElse(x.getDeclarationDescriptor.getExtensionReceiverParameter)
                   val ref = VarRef(receiver.toJsIdent)(x.getType.toJsType)
                   Apply(ref, m.getterIdent(), List())(tpe)
+
                 case _: ImplicitClassReceiver =>
-                  Apply(This()(recv.toJsClassType), m.getterIdent(), List())(tpe)
-                case x: ExpressionReceiver => Apply(This()(recv.toJsClassType), m.getterIdent(), List())(tpe)
+                  val rcv = genThisFromContext(recv.toJsClassType, m)
+                  Apply(rcv, m.getterIdent(), List())(tpe)
+
+                case x: ExpressionReceiver =>
+                  val rcv = genThisFromContext(recv.toJsClassType, m)
+                  Apply(rcv, m.getterIdent(), List())(tpe)
+
                 case _ =>
                   notImplemented("after KtNameReferenceExpression > PropertyDescriptor")
               }
@@ -149,7 +154,9 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case k: KtIsExpression => GenIs(k).tree
       case k: KtThisExpression =>
         val tpe = c.bindingContext().getType(k)
-        This()(tpe.toJsType)
+        val desc = getClassDescriptorForType(tpe)
+
+        genThisFromContext(tpe.toJsType, desc)
       case _ =>
         notImplemented("default case on tree")
     }
@@ -173,11 +180,10 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
   private def genLambda(l: KtLambdaExpression) : Tree = {
     val lambdaContext = l.getContext
-    val params =
-      if (lambdaContext.isInstanceOf[KtNamedFunction])
-        Some(lambdaContext.asInstanceOf[KtNamedFunction].getValueParameters.asScala.toList)
-      else
-        None
+    val params = lambdaContext match {
+      case nf: KtNamedFunction => Some(nf.getValueParameters.asScala.toList)
+      case _ => None
+    }
 
     val body = GenBody(l.getBodyExpression).treeOption
     val desc = BindingUtils.getFunctionDescriptor(c.bindingContext(), l.getFunctionLiteral)
@@ -192,18 +198,18 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
     val b : Tree = body.getOrElse({
       val static = DescriptorUtils.isStaticDeclaration(desc)
       val methodName = desc.toJsMethodIdent
-      val parameters = desc.getValueParameters.asScala.map(x => VarRef(Ident(x.getName.toString))(x.getType.toJsClassType)).toList
+      val parameters = desc.getValueParameters.asScala.map(x => VarRef(Ident(x.getName.toString))(x.getType.toJsType)).toList
 
       if (static) ApplyStatic(ct, methodName, parameters)(desc.getReturnType.toJsType)
-      else Apply(VarRef(Ident("$this"))(ct), methodName, parameters)(desc.getReturnType.toJsClassType)
+      else Apply(VarRef(Ident("$this"))(ct), methodName, parameters)(desc.getReturnType.toJsType)
     })
 
 
-    val closureParams = desc.getValueParameters.asScala.map(_.toJsParamDef).toList
+    val closureParams = desc.getValueParameters.asScala.map(_.toJsAnyParamDef).toList
     val closure = containingClass match {
       case Some(cc) =>
         val funcCaptureParams = funArgs.getOrElse(Nil)
-          .map(GenParam(_).tree.asInstanceOf[ParamDef])
+          .map(GenParam(_).tree)
 
         val funcCaptureValues = funArgs.getOrElse(Nil)
           .map(x => {
@@ -213,10 +219,11 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
           })
 
         val captureParams = List(ParamDef(Ident("$this"), ct, mutable = false, rest = false)) ++ funcCaptureParams
-        val captureValues = List[Trees.Tree](This()(ct)) ++ funcCaptureValues
-        val closureParams = desc.getValueParameters.asScala.map(_.toJsParamDef).toList
+        val captureValues = List[Trees.Tree](genThisFromContext(ct)) ++ funcCaptureValues
         Closure(captureParams, closureParams, b, captureValues)
-      case None => Closure(List(), closureParams, b, List())
+
+      case None =>
+        Closure(List(), closureParams, b, List())
     }
 
     closure

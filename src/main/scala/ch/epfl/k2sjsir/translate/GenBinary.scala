@@ -1,5 +1,6 @@
 package ch.epfl.k2sjsir.translate
 
+import ch.epfl.k2sjsir.utils.Utils
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.operation.AssignmentTranslator
@@ -12,6 +13,9 @@ import org.jetbrains.kotlin.types.expressions.OperatorConventions
 import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types._
+import org.scalajs.core.ir.Trees.BinaryOp._
+
+import scala.annotation.switch
 
 case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) extends Gen[KtBinaryExpression] {
   import GenBinary._
@@ -30,15 +34,150 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
     else if (isNotOverloadable(op)) {
       val binOp = getBinaryOp(op.toString, lhs.tpe)
       BinaryOp(binOp, lhs, rhs)
-    } else if (isCompareToCall(op, desc)) {
+    } else if (isRefCompare(op)) {
+      val binOp = builtinBinarOp(op.toString)
+      BinaryOp(binOp, lhs, rhs)
+    }
+    else if (isCompareToCall(op, desc)) {
+
       if (isNumericType(lhs.tpe) && isNumericType(rhs.tpe)) {
-        BinaryOp(numBinaryOp(op.toString), lhs, rhs)
+        BinaryOp(doubleBinaryOp(op.toString), adaptPrimitive(lhs, DoubleType), adaptPrimitive(rhs, DoubleType))
       } else if (lhs.tpe == StringType || lhs.tpe == ClassType("T")) {
         val s = stringCompareTo(lhs, rhs)
-        val binOp = numBinaryOp(op.toString)
+        val binOp = intBinaryOp(op.toString)
         BinaryOp(binOp, s, IntLiteral(0))
       } else notImplemented()
-    } else if (isStructCompare(op)) {
+
+    } else if (tpe == StringType || tpe == ClassType("T")) {
+      BinaryOp(String_+, lhs, rhs)
+    } else {
+
+      val opName = op match {
+        case KtTokens.IDENTIFIER => desc.toJsName
+        case k: KtSingleValueToken => k.toString
+        case _ => op.toString
+      }
+
+      // See https://github.com/scala-js/scala-js/blob/master/compiler/src/main/scala/org/scalajs/core/compiler/GenJSCode.scala -> def genSimpleOp
+      val isShift = isShiftOp(opName)
+      val leftKind = lhs.tpe
+      val rightKind = rhs.tpe
+
+      val opType = {
+        if (isShift) {
+          if (leftKind == LongType) LongType
+          else IntType
+        } else {
+          (leftKind, rightKind) match {
+            case (DoubleType, _) | (_, DoubleType) => DoubleType
+            case (FloatType, _) | (_, FloatType) => FloatType
+            case (LongType, _) | (_, LongType) => LongType
+            case (CharType|ByteType|ShortType|IntType, _) | (_, CharType|ByteType|ShortType|IntType) => IntType
+            case (BooleanType, _) | (_, BooleanType) => BooleanType
+            case _ => AnyType
+          }
+        }
+      }
+
+      if (lhs.tpe == AnyType || rhs.tpe == AnyType)
+        println(opName)
+
+      val lsrc =
+        if (opType == AnyType || opType == StringType) lhs
+        else adaptPrimitive(lhs, opType)
+      val rsrc =
+        if (opType == AnyType || opType == StringType) rhs
+        else adaptPrimitive(rhs, if (isShift) IntType else opType)
+
+      (opType: @unchecked) match {
+        case IntType =>
+          BinaryOp(intBinaryOp(opName), lsrc, rsrc)
+
+        case LongType =>
+          BinaryOp(longBinaryOp(opName), lsrc, rsrc)
+
+        case FloatType =>
+          def withFloats(op: Int): Tree =
+            BinaryOp(op, lsrc, rsrc)
+
+          def toDouble(value: Tree): Tree =
+            UnaryOp(UnaryOp.FloatToDouble, value)
+
+          def withDoubles(op: Int): Tree =
+            BinaryOp(op, toDouble(lsrc), toDouble(rsrc))
+
+          (opName) match {
+            case "PLUS" => withFloats(Float_+)
+            case "MINUS" => withFloats(Float_-)
+            case "MUL" => withFloats(Float_*)
+            case "DIV" => withFloats(Float_/)
+            case "PERC" => withFloats(Float_%)
+
+            case "EQEQ"  => withDoubles(Double_==)
+            case "EXCLEQ"  => withDoubles(Double_!=)
+            case "LT"  => withDoubles(Double_<)
+            case "LTEQ"  => withDoubles(Double_<=)
+            case "GT"  => withDoubles(Double_>)
+            case "GTEQ"  => withDoubles(Double_>=)
+          }
+
+        case DoubleType =>
+          BinaryOp(doubleBinaryOp(opName), lsrc, rsrc)
+
+        case BooleanType =>
+          (opName: @switch) match {
+            case "or" =>
+              BinaryOp(Boolean_|, lsrc, rsrc)
+            case "and" =>
+              BinaryOp(Boolean_&, lsrc, rsrc)
+            case "EQEQ" =>
+              BinaryOp(Boolean_==, lsrc, rsrc)
+            case "xor" | "EXCLEQ" =>
+              BinaryOp(Boolean_!=, lsrc, rsrc)
+          }
+
+        case AnyType => {
+          // See structural equality definition in Kotlin docs
+
+          val lhsName = Ident(Utils.getFreshName())
+          val rhsName = Ident(Utils.getFreshName())
+
+          val lhsDef = VarDef(lhsName, lhs.tpe, false, lhs)
+          val rhsDef = VarDef(rhsName, rhs.tpe, false, rhs)
+
+          val lhsRef = VarRef(lhsName)(lhs.tpe)
+          val rhsRef = VarRef(rhsName)(rhs.tpe)
+
+          val equalsIdent = Ident("equals__O__Z", Some("equals"))
+
+          val finalIf = If(
+            BinaryOp(
+              BinaryOp.===,
+              lhsRef,
+              Null()
+            ),
+            BinaryOp(
+              BinaryOp.===,
+              rhsRef,
+              Null()
+            ),
+            Apply(lhsRef, equalsIdent, List(rhsRef))(BooleanType)
+          )(BooleanType)
+
+          val block = Block(List(
+            lhsDef,
+            rhsDef,
+            finalIf
+          ))
+
+          if (op == KtTokens.EXCLEQ)
+            UnaryOp(UnaryOp.Boolean_!, block)
+          else
+            block
+        }
+      }
+    }
+    /* else if (isStructCompare(op)) {
       val binOp =
         if (isLongType(lhs.tpe) && isLongType(rhs.tpe)) Some(longBinaryOp(op.toString))
         else if (isNumericType(lhs.tpe) && isNumericType(rhs.tpe)) Some(numBinaryOp(op.toString))
@@ -85,9 +224,6 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
         else
           block
       }
-    } else if (isRefCompare(op)) {
-      val binOp = builtinBinarOp(op.toString)
-      BinaryOp(binOp, lhs, rhs)
     } else {
       val binOp = op match {
         case KtTokens.IDENTIFIER => getBinaryOp(desc.toJsName, tpe)
@@ -103,6 +239,7 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
       }
       BinaryOp(binOp, clhs, crhs)
     }
+    */
   }
 
   private def translateElvis(left: Tree, right: Tree): Tree = {
@@ -154,15 +291,6 @@ object GenBinary {
     else UnaryOp(UnaryOp.DoubleToFloat, notLong)
   }
 
-  private val numBinaryOp = Map(
-    "LT" -> BinaryOp.Num_<,
-    "LTEQ" -> BinaryOp.Num_<=,
-    "EQEQ" -> BinaryOp.Num_==,
-    "GTEQ" -> BinaryOp.Num_>=,
-    "GT" -> BinaryOp.Num_>,
-    "EXCLEQ" -> BinaryOp.Num_!=
-  )
-
   private val longBinaryOp = Map(
     "EQEQ" -> BinaryOp.Long_==,
     "EXCLEQ" -> BinaryOp.Long_!=,
@@ -194,7 +322,13 @@ object GenBinary {
     "shr" -> BinaryOp.Int_>>,
     "ushr" -> BinaryOp.Int_>>>,
     "inc" -> BinaryOp.Int_+,
-    "dec" -> BinaryOp.Int_-
+    "dec" -> BinaryOp.Int_-,
+    "LT" -> BinaryOp.Int_<,
+    "LTEQ" -> BinaryOp.Int_<=,
+    "EQEQ" -> BinaryOp.Int_==,
+    "GTEQ" -> BinaryOp.Int_>=,
+    "GT" -> BinaryOp.Int_>,
+    "EXCLEQ" -> BinaryOp.Int_!=
   )
 
   private val doubleBinaryOp = Map(
@@ -204,7 +338,13 @@ object GenBinary {
     "DIV" -> BinaryOp.Double_/,
     "PERC" -> BinaryOp.Double_%,
     "inc" -> BinaryOp.Double_+,
-    "dec" -> BinaryOp.Double_-
+    "dec" -> BinaryOp.Double_-,
+    "LT" -> BinaryOp.Double_<,
+    "LTEQ" -> BinaryOp.Double_<=,
+    "EQEQ" -> BinaryOp.Double_==,
+    "GTEQ" -> BinaryOp.Double_>=,
+    "GT" -> BinaryOp.Double_>,
+    "EXCLEQ" -> BinaryOp.Double_!=
   )
 
   private val floatBinaryOp = Map(
@@ -250,6 +390,12 @@ object GenBinary {
 
   val isNumericType: Type => Boolean =
     Set(IntType, LongType, DoubleType, FloatType)
+
+  private val shiftOps = Set("shl", "shr", "ushr"/*, "ushl"*/)
+
+  private def isShiftOp(opName: String): Boolean = {
+    shiftOps.contains(opName)
+  }
 
   private def stringCompareTo(lhs: Tree, rhs: Tree)(implicit pos: Position): Tree =
     Apply(LoadModule(ClassType("sjsr_RuntimeString$")),

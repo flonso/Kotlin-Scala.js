@@ -6,8 +6,6 @@ import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.{
-  InfoSerializers,
-  Infos,
   InvalidIRException,
   Serializers
 }
@@ -26,8 +24,6 @@ object SJSIRCodegen {
 
     val output = new FileOutputStream(file)
     try {
-      val infos = Infos.generateClassInfo(tree)
-      InfoSerializers.serialize(output, infos)
       Serializers.serialize(output, tree)
     } catch {
       case e: InvalidIRException =>

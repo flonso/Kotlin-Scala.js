@@ -53,13 +53,13 @@ case class GenWhen(d: KtWhenExpression)(implicit val c: TranslationContext) exte
   }
 
   // TODO: Export this in a Util library instead (to avoid repetitions)
-  private def getTypeForIs(tpe: String): ReferenceType = tpe match {
-    case "I" => ClassType("jl_Integer")
-    case "D" => ClassType("jl_Double")
-    case "F" => ClassType("jl_Float")
-    case "Z" => ClassType("jl_Boolean")
-    case "J" => ClassType("jl_Long")
-    case other => ClassType(other)
+  private def getTypeForIs(tpe: String): TypeRef = tpe match {
+    case "I" => ClassRef("jl_Integer")
+    case "D" => ClassRef("jl_Double")
+    case "F" => ClassRef("jl_Float")
+    case "Z" => ClassRef("jl_Boolean")
+    case "J" => ClassRef("jl_Long")
+    case other => ClassRef(other)
   }
 
 }

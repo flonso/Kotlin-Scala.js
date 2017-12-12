@@ -9,6 +9,7 @@ import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{Definitions, Position, Types}
 import org.scalajs.core.ir.ClassKind
 import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
+import org.jetbrains.kotlin.resolve.DescriptorUtils
 
 import scala.collection.JavaConverters._
 
@@ -43,9 +44,13 @@ object Utils {
   implicit class ParameterTranslator(d: ParameterDescriptor) {
     private val tpe = d.getReturnType.toJsType
 
-    def toJsParamDef(implicit pos: Position): ParamDef = ParamDef(d.toJsIdent, tpe, mutable = false, rest = false)
+    def toJsAnyParamDef(implicit pos: Position): ParamDef = _toJsParamDef(Some(AnyType))
+
+    def toJsParamDef(implicit pos: Position): ParamDef = _toJsParamDef()
 
     def toJsInternal: String = toInternal(tpe)
+
+    private def _toJsParamDef(paramTpe: Option[Type] = None)(implicit pos: Position) = ParamDef(d.toJsIdent, paramTpe.getOrElse(tpe), mutable = false, rest = false)
   }
 
   def isVarArg(d: ParameterDescriptor): Boolean = d match {
@@ -60,7 +65,7 @@ object Utils {
   implicit class KotlinTypeTranslator(t: KotlinType) {
     def toJsType: Type = getType(t)
 
-    def toJsRefType: ReferenceType = getRefType(t)
+    def toJsTypeRef: TypeRef = getTypeRef(t)
 
     def toJsClassType: ClassType = getClassType(t)
 
@@ -83,48 +88,158 @@ object Utils {
     else getFqName(desc).asString()
   }
 
+  def getFreshName(prefix: String = "x$"): String = {
+    prefix + java.util.UUID.randomUUID().toString.replaceAllLiterally("-", "")
+  }
+
   private def getType(tpe: KotlinType, isVararg: Boolean = false): Type = {
-    types.getOrElse(getName(tpe), getRefType(tpe).asInstanceOf[Type])
+    if (isLambdaType(tpe)) AnyType
+    else {
+      val ret = getTypeRef(tpe) match {
+        case ClassRef(cls) => ClassType(cls)
+        case typeRef: ArrayTypeRef => ArrayType(typeRef)
+      }
+
+      types.getOrElse(getName(tpe), ret)
+    }
   }
 
-  private def getRefType(tpe: KotlinType): ReferenceType = {
+  def adaptPrimitive(value: Tree, to: Type)(
+    implicit pos: Position): Tree = {
+    genConversion(value.tpe, to, value)
+  }
+
+  /* This method corresponds to the method of the same name in
+   * BCodeBodyBuilder of the JVM back-end. It ends up calling the method
+   * BCodeIdiomatic.emitT2T, whose logic we replicate here.
+   */
+  private def genConversion(from: Type, to: Type, value: Tree)(
+    implicit pos: Position): Tree = {
+    import UnaryOp._
+
+    if (from == to || from == NothingType) {
+      value
+    } else if (from == BooleanType || to == BooleanType) {
+      throw new AssertionError(s"Invalid genConversion from $from to $to")
+    } else {
+      def intValue = (from: @unchecked) match {
+        case IntType    => value
+        case CharType   => UnaryOp(CharToInt, value)
+        case ByteType   => UnaryOp(ByteToInt, value)
+        case ShortType  => UnaryOp(ShortToInt, value)
+        case LongType   => UnaryOp(LongToInt, value)
+        case FloatType  => UnaryOp(DoubleToInt, UnaryOp(FloatToDouble, value))
+        case DoubleType => UnaryOp(DoubleToInt, value)
+      }
+
+      def doubleValue = from match {
+        case DoubleType => value
+        case FloatType  => UnaryOp(FloatToDouble, value)
+        case LongType   => UnaryOp(LongToDouble, value)
+        case _                => UnaryOp(IntToDouble, intValue)
+      }
+
+      (to: @unchecked) match {
+        case CharType =>
+          UnaryOp(IntToChar, intValue)
+        case ByteType =>
+          UnaryOp(IntToByte, intValue)
+        case ShortType =>
+          UnaryOp(IntToShort, intValue)
+        case IntType =>
+          intValue
+        case LongType =>
+          from match {
+            case FloatType | DoubleType =>
+              UnaryOp(DoubleToLong, doubleValue)
+            case _ =>
+              UnaryOp(IntToLong, intValue)
+          }
+        case FloatType =>
+          UnaryOp(UnaryOp.DoubleToFloat, doubleValue)
+        case DoubleType =>
+          doubleValue
+      }
+    }
+  }
+
+  def isPrimitiveType(value: Type): Boolean = {
+    value match {
+      case BooleanType | CharType | ByteType |
+           ShortType | IntType | LongType | FloatType |
+           DoubleType =>
+        true
+      case _ => false
+    }
+  }
+
+  def genThisFromContext(tpe: Type, clsDesc: ClassDescriptor)(implicit pos: Position): Tree = {
+    if (clsDesc != null && clsDesc.toJsClassKind == ClassKind.Interface)
+      return VarRef(Ident("$this"))(clsDesc.toJsClassType)
+    else
+      This()(tpe)
+  }
+
+  def genThisFromContext(tpe: Type, cmd: CallableMemberDescriptor = null)(implicit pos: Position): Tree = {
+    if (cmd != null) {
+      val dr = cmd.getDispatchReceiverParameter
+
+      if (dr != null) {
+        val clsDesc = DescriptorUtils.getClassDescriptorForType(dr.getType)
+
+        return genThisFromContext(tpe, clsDesc)
+      }
+    }
+
+    This()(tpe)
+  }
+
+  private def isLambdaType(tpe: KotlinType): Boolean = {
+    tpe.toString.matches("Function[0-9]+.*")
+  }
+
+  private def getTypeRef(tpe: KotlinType): TypeRef = {
     val name = getName(tpe)
-    if (name == "kotlin.Array" || arrayTypes.contains(name)) getArrayType(tpe)
+    if (name == "kotlin.Array" || arrayTypes.contains(name)) getArrayTypeRef(tpe)
     else if (name.startsWith("kotlin.Function")) getFunctionType(name)
-    else ClassType(toInternal(types.getOrElse(name, getClassType(tpe))))
+    else ClassRef(toInternal(types.getOrElse(name, getClassType(tpe))))
   }
 
-  private def getFunctionType(name: String): ReferenceType = {
+  private def getFunctionType(name: String): TypeRef = {
     // FIXME: Keep kotlin.Function when stdlib is working
     val suffix = name.replace("kotlin.Function", "")
-    ClassType(s"sjs_js_Function$suffix")
+    ClassRef(s"sjs_js_Function$suffix")
   }
 
-  private def getClassType(tpe: KotlinType): ClassType =
+  private def getClassType(tpe: KotlinType): ClassType = {
     ClassType(encodeClassName(getName(tpe), ""))
+  }
 
   private def getClassKind(kind: KtClassKind): ClassKind = {
     classKinds(kind)
   }
 
-  private def getArrayType(tpe: KotlinType): ArrayType = {
+  private def getArrayTypeRef(tpe: KotlinType): ArrayTypeRef = {
     val name = getName(tpe)
     val args = tpe.getArguments.asScala.map(_.getType)
-    if (name == "kotlin.Array") ArrayType(getRefType(args.head))
+    if (name == "kotlin.Array") ArrayTypeRef.of(getTypeRef(args.head))
     else arrayTypes(name)
   }
 
+  private def getArrayType(tpe: KotlinType): ArrayType = {
+    ArrayType(getArrayTypeRef(tpe))
+  }
+
   private val arrayTypes = Map(
-    "kotlin.IntArray" -> IntType,
-    "kotlin.BooleanArray" -> BooleanType,
-    "kotlin.CharArray" -> IntType,
-    "kotlin.ByteArray" -> IntType,
-    "kotlin.ShortArray" -> IntType,
-    "kotlin.IntArray" -> IntType,
-    "kotlin.FloatArray" -> FloatType,
-    "kotlin.LongArray" -> LongType,
-    "kotlin.DoubleArray" -> DoubleType
-  ).mapValues(t => ArrayType(ClassType(toInternal(t))))
+    "kotlin.IntArray" -> ClassRef("I"),
+    "kotlin.BooleanArray" -> ClassRef("Z"),
+    "kotlin.CharArray" -> ClassRef("C"),
+    "kotlin.ByteArray" -> ClassRef("B"),
+    "kotlin.ShortArray" -> ClassRef("S"),
+    "kotlin.FloatArray" -> ClassRef("F"),
+    "kotlin.LongArray" -> ClassRef("J"),
+    "kotlin.DoubleArray" -> ClassRef("D")
+  ).mapValues(t => ArrayTypeRef.of(t))
 
   private val types = Map(
     "kotlin.Any" -> AnyType,
@@ -159,7 +274,7 @@ object Utils {
     case FloatType => "F"
     case DoubleType => "D"
     case StringType => "T"
-    case ArrayType(elem, _) => "A" + encodeName(elem)
+    case ArrayType(ArrayTypeRef(elem, dims)) => "A"*dims + encodeName(elem)
     // FIXME: Remove this after kotlin-stdlib is compiled correctly
     case ClassType(name) if name.matches("kotlin.Function*") => name.replace("kotlin.Function", "sjs_js_Function")
     case ClassType(name) => name

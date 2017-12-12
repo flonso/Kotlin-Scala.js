@@ -1,10 +1,9 @@
 package ch.epfl.k2sjsir.translate
 
-import ch.epfl.k2sjsir.utils.NameEncoder
 import ch.epfl.k2sjsir.utils.NameEncoder._
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.builtins.functions.FunctionInvokeDescriptor
-import org.jetbrains.kotlin.descriptors.{ClassConstructorDescriptor, SimpleFunctionDescriptor}
+import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
+import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDescriptor, SimpleFunctionDescriptor}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression}
@@ -12,9 +11,8 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver, ReceiverValue}
-import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedSimpleFunctionDescriptor
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{ArrayType, ClassType, Type}
+import org.scalajs.core.ir.Types._
 
 import scala.collection.JavaConverters._
 
@@ -71,10 +69,8 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
             else if (isArray) {
               arrayOps(receiver, rtpe, name, args).getOrElse(notImplemented("Missing array operation"))
             }
-            else if (GenUnary.isUnaryOp(name)) {
-              val op = GenUnary.convertToOp(receiver.tpe, rtpe, receiver)
-
-              op.getOrElse(notImplemented(s"missing UnaryOp from ${receiver.tpe} to $rtpe"))
+            else if (isUnaryOp(name)) {
+              adaptPrimitive(receiver, rtpe)
             }
             else {
               // FIXME: do not match on the receiver but on its tpe
@@ -86,14 +82,20 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                   val name = if (desc.getName.toString == "invoke") NameEncoder.encodeApplyLambda(desc) else desc.toJsMethodIdent
 
                   if (isLambdaCall && !isDirectInvokeCall) {
+                    // TODO: maybe move this logic inside toJsIdent
                     val lambdaFuncName = """((.+)\(.*\))""".r.replaceAllIn(d.getText, "$2")
                     val sjsJsFunction = s"sjs_js_Function${args.size}"
                     val lambdaType = ClassType(sjsJsFunction)
                     val lambdaName = Ident(s"${lambdaFuncName}__$sjsJsFunction")
-                    JSFunctionApply(Apply(receiver, lambdaName, Nil)(lambdaType), args)
+
+                    // Cast -> AsInstanceOf is  and Unboxed... if primitive type
+                    // GenjsCode --> fromAny
+                    val funcApply = JSFunctionApply(Apply(receiver, lambdaName, Nil)(lambdaType), args)
+
+                    castJsFunctionApply(funcApply, desc)
                   }
                   else if (isLambdaCall && isDirectInvokeCall)
-                    JSFunctionApply(receiver, args)
+                    castJsFunctionApply(JSFunctionApply(receiver, args), desc)
                   else
                     Apply(receiver, name, args)(rtpe)
               }
@@ -101,15 +103,25 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
 
           } else {
 
-            val dr = Option(desc.getDispatchReceiverParameter).getOrElse(desc.getExtensionReceiverParameter)
+            val extRcvParam = Option(desc.getExtensionReceiverParameter)
+            val extRcv = {
+              if (extRcvParam.nonEmpty)
+                Option(VarRef(extRcvParam.get.toJsIdent)(extRcvParam.get.getType.toJsType))
+              else
+                None
+            }
 
             if(DescriptorUtils.isExtension(desc)) {
+              genExtensionCall(
+                extRcv.getOrElse(
+                  throw new Exception("No extension receiver instance defined")
+                )
+              )
 
-              genExtensionCall(VarRef(dr.toJsIdent)(dr.getType.toJsType))
             }
             else if(isTopLevelFunction(sf)) {
-
               ApplyStatic(ClassType(NameEncoder.encodeWithSourceFile(sf)), desc.toJsMethodIdent, args)(desc.getReturnType.toJsType)
+
             }
             else {
               val dispatchReceiver = resolved.getDispatchReceiver
@@ -118,13 +130,19 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                 GenJsFunc(d).tree
               else {
                 val receiver = dispatchReceiver match {
-                  case i: ImplicitClassReceiver => This()(i.getClassDescriptor.toJsClassType)
-                  case _: ExtensionReceiver => VarRef(dr.toJsIdent)(dr.getType.toJsType)
+                  case i: ImplicitClassReceiver =>
+                    genThisFromContext(i.getClassDescriptor.toJsClassType)
+
+                  case _: ExtensionReceiver =>
+                    val dr = desc.getDispatchReceiverParameter
+                    VarRef(dr.toJsIdent)(dr.getType.toJsType)
+
                   case e: ExpressionReceiver =>
                     if (isReceiverJsFunc(dispatchReceiver))
                       GenJsFunc(e.getExpression.asInstanceOf[KtCallExpression]).tree
                     else
                       GenExpr(e.getExpression).tree
+
                   case _ => notImplemented("while looking for receiver")
 
                 }
@@ -132,13 +150,13 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                 // If it's a call to kotlin js func, pass the arguments to the call directly
                 if (isReceiverJsFunc(dispatchReceiver)) {
                   receiver match {
-                    case Apply(r, n, _) =>
-                      Apply(r, n, args)(rtpe)
+                    case a@Apply(r, n, _) =>
+                      Apply(r, n, args)(a.tpe)
                   }
                 }
                 else {
                   if (desc.getName.toString == "invoke")
-                    JSFunctionApply(receiver, args)
+                    castJsFunctionApply(JSFunctionApply(receiver, args), desc)
                   else
                     Apply(receiver, desc.toJsMethodIdent, args)(rtpe)
                 }
@@ -151,6 +169,21 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
         notImplemented("in tree method")
     }
   }
+
+  private def castJsFunctionApply(jsFuncApply: JSFunctionApply, desc: CallableDescriptor): Tree = {
+    val rtpe = desc.getReturnType
+
+    if (Utils.isPrimitiveType(rtpe.toJsType)) {
+      Unbox(jsFuncApply, rtpe.toJsInternal.charAt(0))
+    } else {
+      AsInstanceOf(jsFuncApply, rtpe.toJsTypeRef)
+    }
+  }
+
+  private def isUnaryOp(n: String): Boolean =
+    n == "toByte" || n == "toShort" || n == "toLong" || n == "toInt" || n == "toDouble" || n == "toFloat" || n == "not" || isUnaryToBinary(n)
+
+  private def isUnaryToBinary(n: String) = n == "unaryMinus"
 
   private def isDirectCallToJsFunc(rcv: ReceiverValue): Boolean = {
     rcv == null && name == "js"
@@ -181,24 +214,38 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
     resolved.getCall.getValueArguments.asScala.map(x => GenExpr(x.getArgumentExpression).tree)
   }
 
+  /*
+  The instance of the class in which the extension is declared is called dispatch receiver,
+  and the instance of the receiver type of the extension method is called extension receiver.
+  -->
+  dispatchReceiver = instance (this) of the current class
+  extensionReceiver = instance (this) of the extended class
+   */
   def genExtensionCall(receiver: Tree) : Tree = {
-    val ext = desc.getDispatchReceiverParameter
-    if (null != ext) {
-      val cnt = ext.getContainingDeclaration
+    val dispRcvParameter = desc.getDispatchReceiverParameter
+
+    if (null != dispRcvParameter) {
+      // We are inside a class declaration
+      val cnt = dispRcvParameter.getContainingDeclaration
 
       val className = getFqName(cnt).asString()
       val suffix =
         if (DescriptorUtils.isObject(cnt) || DescriptorUtils.isCompanionObject(cnt)) "$"
         else ""
       val c = ClassType(encodeClassName(className, suffix))
-      Apply(This()(c), desc.toJsMethodIdent, receiver :: args)(rtpe)
+
+      val rcv = genThisFromContext(c)
+      Apply(rcv, desc.toJsMethodIdent, receiver :: args)(rtpe)
+
     } else {
       val o = desc.getExtensionReceiverParameter
       val cnt = o.getContainingDeclaration
       val name = JvmFileClassUtil.getFileClassInfoNoResolve(d.getContainingKtFile).getFileClassFqName.asString()
       val encodedName = NameEncoder.encodeClassName(name, "")
 
-      ApplyStatic(ClassType(encodedName), desc.toJsMethodIdent, receiver :: args)(rtpe)
+      val clsTpe = ClassType(encodedName)
+
+      ApplyStatic(clsTpe, desc.toJsMethodIdent, receiver :: args)(rtpe)
     }
   }
 

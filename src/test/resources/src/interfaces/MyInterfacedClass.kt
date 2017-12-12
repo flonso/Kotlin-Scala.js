@@ -4,6 +4,10 @@ class MyInterfacedClass(override var c: String) : MyInterface  {
     override val a: Int = 0
     override val b: String = "Hello World"
 
+    fun tmp(d: Dog) {
+        d.bark()
+    }
+
     override fun petYourDog() {
         println("You pet your dog !")
         dog.bark()
@@ -22,5 +26,9 @@ class MyInterfacedClass(override var c: String) : MyInterface  {
 
     override fun toString(): String {
         return "(a = " + a + " b = " + b + " c = " + c + " dog = " + dog + ")"
+    }
+
+    override fun assignSomeValues() {
+        c = "Hey there."
     }
 }

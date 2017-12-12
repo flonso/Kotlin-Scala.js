@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ClassValueReceiver, ExpressionReceiver, ImplicitClassReceiver, ThisClassReceiver}
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.NoType
+import org.scalajs.core.ir.Types.{IntType, NoType}
 
 
 case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) extends Gen[KtBinaryExpression] {
@@ -36,20 +36,24 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
           call.getResultingDescriptor match {
             case p: PropertyDescriptor =>
               val receiver = call.getDispatchReceiver match {
-                case cl: ThisClassReceiver => This()(cl.getType.toJsType)
+                case cl: ThisClassReceiver => genThisFromContext(cl.getType.toJsType, p)
                 case cl: ClassValueReceiver => GenExpr(cl.getExpression).tree
                 case e: ExpressionReceiver => GenExpr(e.getExpression).tree
                 case _ => notImplemented("Unhandled receiver type (from PropertyDescriptor)")
               }
-              d.getOperationToken match {
+
+              val ret = d.getOperationToken match {
                 case KtTokens.PLUSEQ | KtTokens.MINUSEQ | KtTokens.MULTEQ | KtTokens.DIVEQ | KtTokens.PERCEQ =>
                   val code = d.getOperationToken.toString.replaceAll("[T]?EQ", "")
                   val binOp = GenBinary.getBinaryOp(code, tpe)
                   val args = BinaryOp(binOp, Apply(receiver, p.getGetter.toJsMethodIdent, List())(tpe), right)
                   Apply(receiver, p.getSetter.toJsMethodIdent, List(args))(NoType)
+
                 case KtTokens.EQ =>
                   Apply(receiver, p.getSetter.toJsMethodIdent, List(right))(NoType)
               }
+
+              ret
             case l: LocalVariableDescriptor =>
               val ref = VarRef(l.toJsIdent)(l.getType.toJsType)
               d.getOperationToken match {
@@ -57,6 +61,7 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
                   val code = d.getOperationToken.toString.replaceAll("[T]?EQ", "")
                   val binOp = GenBinary.getBinaryOp(code, tpe)
                   Assign(VarRef(l.toJsIdent)(l.getType.toJsType), BinaryOp(binOp, ref, right))
+
                 case KtTokens.EQ =>
                   Assign(VarRef(l.toJsIdent)(l.getType.toJsType), right)
               }
@@ -73,8 +78,9 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
               val property = s.getPropertyDescriptor
               val thisTpe = DescriptorUtils.getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
               val name = property.getName.asString()
+              val rcv = genThisFromContext(thisTpe)
 
-              Select(This()(thisTpe), Ident(name))(tpe)
+              Select(rcv, Ident(name))(tpe)
           }
 
           Assign(backingField, right)

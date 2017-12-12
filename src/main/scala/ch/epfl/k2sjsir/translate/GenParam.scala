@@ -11,9 +11,9 @@ import org.scalajs.core.ir.Trees
 import org.scalajs.core.ir.Trees.{Ident, ParamDef}
 import org.scalajs.core.ir.Types.AnyType
 
-case class GenParam(d: KtParameter)(implicit val c: TranslationContext) extends Gen[KtParameter] {
+case class GenParam(d: KtParameter)(implicit val c: TranslationContext) extends IRNodeGen[KtParameter, ParamDef] {
 
-  override def tree: Trees.Tree = {
+  override def tree: ParamDef = {
     val name = Ident(d.getName)
     val ptpe = BindingUtils.getDescriptorForElement(c.bindingContext(), d).asInstanceOf[VariableDescriptor]
     val tpe = ptpe.getType.toJsType

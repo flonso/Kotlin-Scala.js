@@ -15,6 +15,8 @@ open class Toto(b: Int) {
     }
 }
 
+class EmptyClass(val a: Int)
+
 object Test : Toto(5, 7.0) {
 
     var b = 6

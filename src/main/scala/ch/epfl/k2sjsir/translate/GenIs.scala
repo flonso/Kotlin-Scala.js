@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi.KtIsExpression
 import org.scalajs.core.ir.Trees
 import org.scalajs.core.ir.Trees.{IsInstanceOf, UnaryOp}
-import org.scalajs.core.ir.Types.{ClassType, ReferenceType}
+import org.scalajs.core.ir.Types.{ClassRef, TypeRef}
 import ch.epfl.k2sjsir.utils.Utils._
 
 case class GenIs(d: KtIsExpression)(implicit val c: TranslationContext) extends Gen[KtIsExpression] {
@@ -24,12 +24,12 @@ case class GenIs(d: KtIsExpression)(implicit val c: TranslationContext) extends 
   }
 
   // TODO: Export this in a Util library instead (to avoid repetitions)
-  private def getTypeForIs(tpe: String): ReferenceType = tpe match {
-    case "I" => ClassType("jl_Integer")
-    case "D" => ClassType("jl_Double")
-    case "F" => ClassType("jl_Float")
-    case "Z" => ClassType("jl_Boolean")
-    case "J" => ClassType("jl_Long")
-    case other => ClassType(other)
+  private def getTypeForIs(tpe: String): TypeRef = tpe match {
+    case "I" => ClassRef("jl_Integer")
+    case "D" => ClassRef("jl_Double")
+    case "F" => ClassRef("jl_Float")
+    case "Z" => ClassRef("jl_Boolean")
+    case "J" => ClassRef("jl_Long")
+    case other => ClassRef(other)
   }
 }

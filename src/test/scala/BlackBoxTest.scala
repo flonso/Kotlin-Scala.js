@@ -1,6 +1,7 @@
 import java.io.{ByteArrayOutputStream, File, PrintStream}
 
 import ch.epfl.k2sjsir.K2SJSIRCompiler
+import org.jetbrains.kotlin.cli.common.ExitCode
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import scala.sys.process._
@@ -12,7 +13,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
   protected val ROOT_OUT    = "src/test/resources/out"
   protected val ROOT_SRC_LIB= "src/test/resources/src/lib"
   protected val ROOT_LIB_OUT= "src/test/resources/kotlin-out"
-  protected val SCALA_JS_VERSION = "1.0.0-M1"
+  protected val SCALA_JS_VERSION = "1.0.0-M2"
   protected val SCALA_JS_JAR = "scalajs-library_2.12-"+ SCALA_JS_VERSION +".jar"
 
   protected val KOTLIN_HOME = scala.util.Properties.envOrElse("KOTLIN_HOME", "/usr/share/kotlin" )
@@ -26,12 +27,24 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     val files = folder.listFiles()
 
     if (files == null){
-      println("Files are null")
+      println("No files to be deleted")
       return
     }
 
-    files.foreach(f =>
-      if (f.getName.endsWith(".sjsir") || f.getName.endsWith(".js") || f.getName.endsWith(".class")) f.delete())
+    val removedExtensions = Set(".sjsir", ".js", ".class")
+
+    files.foreach { f =>
+      if (f.isDirectory) {
+        cleanOutput(f)
+        f.delete()
+
+      } else {
+        val ext = f.getName.substring(f.getName.lastIndexOf("."))
+
+        if (removedExtensions.contains(ext))
+          f.delete()
+      }
+    }
   }
 
   before {
@@ -49,24 +62,49 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     val files = sources.map(s => s"$ROOT_SOURCE/$s")
     val options = Seq("-Xallow-kotlin-package", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME)
 
-    new K2SJSIRCompiler()
+    val exitCode = new K2SJSIRCompiler()
       .exec(System.err,
         (files ++ options):_*)
 
+
+    if (exitCode != ExitCode.OK)
+      fail(s"Compilation process finished with status $exitCode")
+
     Scalajsld.run(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
 
-    val success = (s"echo $mainClass().main()" #>> new File(s"$ROOT_OUT/$outFile")).!
+    val success = (s"echo $mainClass.main()" #>> new File(s"$ROOT_OUT/$outFile")).!
 
     if(success == 0) {
       val result = s"node $ROOT_OUT/$outFile".!!
-      if(expected.replaceAll("\\s+", "") != result.replaceAll("\\s+", "") ) {
+
+      val expectedRes = expected.replaceAll("\\s+", "")
+      val outputRes = result.replaceAll("\\s+", "")
+      if(expectedRes != outputRes) {
+        val explodeExpected = expected.split("\n")
+        val explodeOutput = result.split("\n")
         val sb = new StringBuffer()
+
         sb.append("\nOutput is different: (whitespace is always ignored)")
+        /*
         sb.append("\noutput: \n")
         sb.append(result)
         sb.append("\nexpected output: \n")
         sb.append(expected)
-        assert(false, sb.toString)
+        */
+
+
+        sb.append("Expected output\t\tOutput\n\n=========================\n\n")
+        for (index <- 0 until math.max(explodeExpected.length, explodeOutput.length)) {
+          if (index < explodeExpected.length)
+            sb.append(explodeExpected(index))
+
+          if (index < explodeOutput.length)
+            sb.append("\t\t" + explodeOutput(index))
+
+          sb.append("\n")
+        }
+
+        fail(sb.toString)
       }
     } else {
       fail("Unable to append line to file")

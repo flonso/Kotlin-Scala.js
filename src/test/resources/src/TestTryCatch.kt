@@ -1,6 +1,7 @@
 fun main(args: Array<String>) {
     try {
-        throw Exception()
+        // FIXME: Check without string param
+        throw Exception("FIXME")
     } catch(e: Exception) {
         println("Exception caught")
     } finally {

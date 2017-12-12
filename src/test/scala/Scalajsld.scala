@@ -12,11 +12,9 @@ import java.net.URI
 
 import org.scalajs.core.ir.ScalaJSVersions
 import org.scalajs.core.tools.io._
-import org.scalajs.core.tools.linker.backend.{LinkerBackend, ModuleKind, OutputMode}
-import org.scalajs.core.tools.linker.frontend.LinkerFrontend
-import org.scalajs.core.tools.linker.{Linker, ModuleInitializer}
+import org.scalajs.core.tools.linker._
+import org.scalajs.core.tools.linker.standard._
 import org.scalajs.core.tools.logging._
-import org.scalajs.core.tools.sem._
 
 import scala.collection.immutable.Seq
 
@@ -95,27 +93,24 @@ object Scalajsld {
 
     for (options <- parser.parse(args, Options())) {
       val classpath = options.stdLib.toList ++ options.cp
-      //val irContainers = IRFileCache.IRContainer.fromClasspath(classpath) // 0.6.15
-      val irContainers = FileScalaJSIRContainer.fromClasspath(classpath) // 1.0.0-M1
+      val irContainers = FileScalaJSIRContainer.fromClasspath(classpath)
       val moduleInitializers = options.moduleInitializers
 
       val semantics =
         if (options.fullOpt) options.semantics.optimized
         else options.semantics
 
-      val frontendConfig = LinkerFrontend.Config()
-
-      val backendConfig = LinkerBackend.Config()
-
-      val config = Linker.Config()
+      val config = StandardLinker.Config()
+        .withSemantics(semantics)
         .withSourceMap(options.sourceMap)
         .withOptimizer(!options.noOpt)
         .withParallel(true)
-        .withFrontendConfig(frontendConfig)
-        .withBackendConfig(backendConfig)
+        .withOutputMode(options.outputMode)
+        .withModuleKind(options.moduleKind)
+        // TODO: Remove it
+        .withCheckIR(false)
 
-      val linker = Linker(semantics, options.outputMode, options.moduleKind,
-        config)
+      val linker = StandardLinker(config)
 
       val logger = new ScalaConsoleLogger(options.logLevel)
       val outFile = WritableFileVirtualJSFile(options.output)

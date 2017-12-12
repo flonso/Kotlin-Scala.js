@@ -10,12 +10,12 @@ import org.scalajs.core.ir.Trees._
 
 import scala.collection.JavaConverters._
 
-case class GenFun(d: KtNamedFunction)(implicit val c: TranslationContext) extends Gen[KtNamedFunction] {
+case class GenFun(d: KtNamedFunction)(implicit val c: TranslationContext) extends IRNodeGen[KtNamedFunction, MethodDef] {
 
   val desc = getFunctionDescriptor(c.bindingContext(), d)
   val cd = DescriptorUtils.getContainingClass(desc)
 
-  override def tree: Tree = {
+  override def tree: MethodDef = {
     val body = GenBody(d.getBodyExpression).treeOption
     val idt = desc.toJsMethodIdent
     val extensionParam = Option(desc.getExtensionReceiverParameter).map(_.toJsParamDef)
@@ -33,7 +33,7 @@ case class GenFun(d: KtNamedFunction)(implicit val c: TranslationContext) extend
     MethodDef(static, idt, args, desc.getReturnType.toJsType, body)(opt, None)
   }
 
-  def withAbstractBody: Tree = {
+  def withAbstractBody: MethodDef = {
     val desc = getFunctionDescriptor(c.bindingContext(), d)
     val body = None
     val idt = desc.toJsMethodIdent

@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.psi.{KtCallExpression, KtStringTemplateExpression, K
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.scalajs.core.ir.Trees
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{ClassType, DoubleType, FloatType}
+import org.scalajs.core.ir.Types.{ClassType, DoubleType, FloatType, IntType}
 
 import scala.collection.JavaConverters._
 
@@ -40,7 +40,7 @@ case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
       case "Kotlin.identityHashCode" =>
         Apply(LoadModule(ClassType("jl_System$")),
               Ident("identityHashCode__O__I"),
-              List())(descriptor.getReturnType.toJsType)
+              List())(IntType)
       case "Number.MIN_VALUE" =>
         findClosestTypeRef(d) match {
           case Some("Double") => DoubleLiteral(Double.MinPositiveValue)

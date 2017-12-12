@@ -18,6 +18,8 @@ class C {
     }
 }
 
+fun String.myExtendedFun(): Int = 2
+
 object Test {
 
     fun String.count2(): Int {
@@ -25,6 +27,7 @@ object Test {
     }
 
     fun String.manyCount2(other: String, other1: String): Int {
+        coucou()
         return count2() + other.count2() + other1.count2()
     }
 
@@ -42,6 +45,10 @@ object Test {
         val d = D()
 
         c.caller(d)
+    }
+
+    fun coucou() {
+
     }
 
 }

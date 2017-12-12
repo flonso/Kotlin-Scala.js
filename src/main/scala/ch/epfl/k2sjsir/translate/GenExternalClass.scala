@@ -12,7 +12,7 @@ import org.scalajs.core.ir.Trees._
 
 import scala.collection.immutable.{List, Nil}
 
-case class GenExternalClass(d: KtClassOrObject)(implicit val c: TranslationContext) extends Gen[KtClassOrObject] {
+case class GenExternalClass(d: KtClassOrObject)(implicit val c: TranslationContext) extends IRNodeGen[KtClassOrObject, ClassDef] {
 
   private val desc = getClassDescriptor(c.bindingContext(), d)
   private val optimizerHints = OptimizerHints.empty
@@ -34,7 +34,7 @@ case class GenExternalClass(d: KtClassOrObject)(implicit val c: TranslationConte
 
     val jsNativeLoadSpec = Some(JSNativeLoadSpec.Global(name, Nil))
 
-    ClassDef(idt, kind, Some(Ident("sjs_js_Object")), List(), jsNativeLoadSpec, List())(optimizerHints)
+    ClassDef(idt, kind, None, Some(Ident("sjs_js_Object")), List(), None, jsNativeLoadSpec, List(), Nil)(optimizerHints)
   }
 
   private def isModule(c: ClassDescriptor): Boolean = c.getKind == OBJECT
