@@ -127,7 +127,7 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
           Seq(genDecl.tree)
     }.flatten.toList
 
-    val interfaceDefs = missingInterfaceDeclarations.collect {
+    val bridges = missingInterfaceDeclarations.collect {
       case nf: KtNamedFunction if !isInterface =>
         /*
          def myInterfaceMethodName(myInterfaceMethodArgs) {
@@ -143,10 +143,11 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
 
             val newBody = {
               val methodIdent = funDesc.toJsMethodIdent
-              val cls = clsDesc.toJsDefaultImplType
+              val defaultImplCls = clsDesc.toJsDefaultImplType
+              val cls = clsDesc.toJsClassType
               val self = genThisFromContext(cls)
               val args = self :: argsParamDef.tail.map(_.ref)
-              ApplyStatic(cls, methodIdent, args)(md.resultType)
+              ApplyStatic(defaultImplCls, methodIdent, args)(md.resultType)
             }
 
             MethodDef(static = false, newName, argsParamDef.tail, resultType, Option(newBody))(OptimizerHints.empty, None)
@@ -184,7 +185,7 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
     }.toList
 
     val constructors = genConstructors
-    val allDefs = paramsInit ++ defs ++ interfaceDefs ++ constructors
+    val allDefs = paramsInit ++ defs ++ bridges ++ constructors
 
     val sprCls = superClass.fold(None: Option[Trees.Ident])(x => Some(x.toJsClassIdent))
 

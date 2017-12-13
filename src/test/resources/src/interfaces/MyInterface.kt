@@ -23,7 +23,6 @@ interface MyInterface : MySuperInterface, DummyInterface {
     override fun toString(): String
 
     override fun dummyFun() {
-        //super.dummyFun()
         println("And some more prints")
     }
 }

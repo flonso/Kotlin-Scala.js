@@ -144,24 +144,8 @@ object NameEncoder {
     params.mkString(OuterSep, OuterSep, "")
   }
 
-  def encodeApply(desc: CallableDescriptor)(implicit pos: Position): Ident = {
-    val retType = desc.getReturnType.toJsInternal
-    val concatType =
-      desc.getValueParameters.asScala.map(_.toJsInternal).mkString("")
-    val types =
-      if (desc.getValueParameters.isEmpty) ""
-      else
-        desc.getValueParameters.asScala
-          .map(_.toJsInternal)
-          .mkString(OuterSep, OuterSep, "")
-    Ident(s"apply$$mc$retType$concatType$$sp${types}__$retType")
-  }
-
   def encodeApplyLambda(desc: CallableDescriptor)(implicit pos: Position): Ident = {
     val retType = desc.getReturnType.toJsInternal
-
-    if (retType == "V" && desc.getValueParameters.size() == 0)
-      return encodeApply(desc)
 
     val concatType =
       desc.getValueParameters.asScala.map(_ => "__O").mkString("")

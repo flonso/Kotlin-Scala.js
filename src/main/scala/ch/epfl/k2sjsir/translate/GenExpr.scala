@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, Extens
 import org.jetbrains.kotlin.resolve.{BindingContext, DescriptorUtils}
 import org.scalajs.core.ir.Trees
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{ArrayType, ClassType, Type}
+import org.scalajs.core.ir.Types.{AnyType, ArrayType, ClassType, Type}
 
 import scala.collection.JavaConverters._
 
@@ -180,6 +180,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
   private def genLambda(l: KtLambdaExpression) : Tree = {
     val lambdaContext = l.getContext
+    // Pass parameters so that they can be used inside the lambda
     val params = lambdaContext match {
       case nf: KtNamedFunction => Some(nf.getValueParameters.asScala.toList)
       case _ => None
@@ -195,7 +196,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
     val containingClass = Option(DescriptorUtils.getContainingClass(desc))
     val ct = containingClass.fold(ClassType(NameEncoder.encodeWithSourceFile(desc)))(cc => cc.toJsClassType)
 
-    val b : Tree = body.getOrElse({
+    val b0 : Tree = body.getOrElse({
       val static = DescriptorUtils.isStaticDeclaration(desc)
       val methodName = desc.toJsMethodIdent
       val parameters = desc.getValueParameters.asScala.map(x => VarRef(Ident(x.getName.toString))(x.getType.toJsType)).toList
@@ -204,10 +205,24 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       else Apply(VarRef(Ident("$this"))(ct), methodName, parameters)(desc.getReturnType.toJsType)
     })
 
+    /*
+     We generate parameters with "fresh" names and declare variables with the original name
+     inside the body with a cast to the correct type (cast from Any to Type).
+    */
+    val varDefs = desc.getValueParameters.asScala.map{
+      param =>
+        val paramIdt = param.toJsClosureIdent
+        val paramRef = cast(VarRef(paramIdt)(AnyType), param.getType)
+        VarDef(param.toJsIdent, param.getType.toJsType, mutable = false, paramRef)
+    }.toList
 
-    val closureParams = desc.getValueParameters.asScala.map(_.toJsAnyParamDef).toList
+    val b1 = ensureBoxed(b0)
+    val b = Block(varDefs ++ List(b1))
+
+
+    val closureParams = desc.getValueParameters.asScala.map(_.toJsClosureParamDef).toList
     val closure = containingClass match {
-      case Some(cc) =>
+      case Some(_) =>
         val funcCaptureParams = funArgs.getOrElse(Nil)
           .map(GenParam(_).tree)
 

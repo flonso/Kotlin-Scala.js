@@ -17,7 +17,7 @@ trait IRNodeGen[T <: KtElement, TreeType <: IRNode] {
 
     val lc = DiagnosticUtils.getLineAndColumnInPsiFile(d.getContainingFile, d.getTextRange)
     val file = d.getContainingFile.getName
-    Position(Position.SourceFile(file), lc.getLine, lc.getColumn)
+    Position(Position.SourceFile(file), lc.getLine - 1, lc.getColumn - 1)
   }
 
   def tree: TreeType

@@ -107,8 +107,7 @@ object Scalajsld {
         .withParallel(true)
         .withOutputMode(options.outputMode)
         .withModuleKind(options.moduleKind)
-        // TODO: Remove it
-        .withCheckIR(false)
+        .withCheckIR(true)
 
       val linker = StandardLinker(config)
 

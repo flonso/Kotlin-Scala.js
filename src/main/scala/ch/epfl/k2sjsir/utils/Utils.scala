@@ -18,9 +18,13 @@ object Utils {
   implicit class DeclarationDescriptorTranslator(d: DeclarationDescriptor) {
     private val name = d.getName.asString()
 
+    def toJsClosureName: String = "closureargs$" + encodeName(name)
+
     def toJsName: String = encodeName(name)
 
     def toJsIdent(implicit pos: Position): Ident = Ident(d.toJsName, Some(name))
+
+    def toJsClosureIdent(implicit pos: Position): Ident = Ident(d.toJsClosureName, Some(name))
   }
 
   implicit class CallableDescriptorTranslator(d: CallableDescriptor) {
@@ -44,13 +48,17 @@ object Utils {
   implicit class ParameterTranslator(d: ParameterDescriptor) {
     private val tpe = d.getReturnType.toJsType
 
+    def toJsClosureParamDef(implicit pos: Position): ParamDef = _toJsParamDef(Some(AnyType), Some(d.toJsClosureIdent))
+
     def toJsAnyParamDef(implicit pos: Position): ParamDef = _toJsParamDef(Some(AnyType))
 
     def toJsParamDef(implicit pos: Position): ParamDef = _toJsParamDef()
 
     def toJsInternal: String = toInternal(tpe)
 
-    private def _toJsParamDef(paramTpe: Option[Type] = None)(implicit pos: Position) = ParamDef(d.toJsIdent, paramTpe.getOrElse(tpe), mutable = false, rest = false)
+    private def _toJsParamDef(paramTpe: Option[Type] = None, ident: Option[Ident] = None)(implicit pos: Position) = {
+      ParamDef(ident.getOrElse(d.toJsIdent), paramTpe.getOrElse(tpe), mutable = false, rest = false)
+    }
   }
 
   def isVarArg(d: ParameterDescriptor): Boolean = d match {
@@ -91,6 +99,25 @@ object Utils {
   def getFreshName(prefix: String = "x$"): String = {
     prefix + java.util.UUID.randomUUID().toString.replaceAllLiterally("-", "")
   }
+
+  def ensureBoxed(t: Tree): Tree = {
+    if (t.tpe == NoType)
+      Block(t, Undefined()(t.pos))(t.pos)
+    else
+      t
+  }
+
+  def cast(t: Tree, rtpe: KotlinType)(implicit pos: Position): Tree = {
+    // TODO: Add a function to determine if it's a JS type
+    if (rtpe.toJsType == NoType || isLambdaType(rtpe)) {
+      t
+    } else if (Utils.isPrimitiveType(rtpe.toJsType)) {
+      Unbox(t, rtpe.toJsInternal.charAt(0))
+    } else {
+      AsInstanceOf(t, rtpe.toJsTypeRef)
+    }
+  }
+
 
   private def getType(tpe: KotlinType, isVararg: Boolean = false): Type = {
     if (isLambdaType(tpe)) AnyType

@@ -82,15 +82,12 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                   val name = if (desc.getName.toString == "invoke") NameEncoder.encodeApplyLambda(desc) else desc.toJsMethodIdent
 
                   if (isLambdaCall && !isDirectInvokeCall) {
-                    // TODO: maybe move this logic inside toJsIdent
                     val lambdaFuncName = """((.+)\(.*\))""".r.replaceAllIn(d.getText, "$2")
-                    val sjsJsFunction = s"sjs_js_Function${args.size}"
-                    val lambdaType = ClassType(sjsJsFunction)
-                    val lambdaName = Ident(s"${lambdaFuncName}__$sjsJsFunction")
+                    val lambdaName = Ident(s"${lambdaFuncName}__O")
 
                     // Cast -> AsInstanceOf is  and Unboxed... if primitive type
                     // GenjsCode --> fromAny
-                    val funcApply = JSFunctionApply(Apply(receiver, lambdaName, Nil)(lambdaType), args)
+                    val funcApply = JSFunctionApply(Apply(receiver, lambdaName, Nil)(AnyType), args)
 
                     castJsFunctionApply(funcApply, desc)
                   }
@@ -172,12 +169,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
 
   private def castJsFunctionApply(jsFuncApply: JSFunctionApply, desc: CallableDescriptor): Tree = {
     val rtpe = desc.getReturnType
-
-    if (Utils.isPrimitiveType(rtpe.toJsType)) {
-      Unbox(jsFuncApply, rtpe.toJsInternal.charAt(0))
-    } else {
-      AsInstanceOf(jsFuncApply, rtpe.toJsTypeRef)
-    }
+    cast(jsFuncApply, rtpe)
   }
 
   private def isUnaryOp(n: String): Boolean =
