@@ -111,7 +111,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
               {
                 BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
                   case m: PropertyDescriptor => Apply(receiver, m.getterIdent(), List())(tpe)
-                  case _ => notImplemented("after KtDotQualifiedExpression > KtNameReferenceExpression")
+                  case desc => notImplemented(s"after KtDotQualifiedExpression > KtNameReferenceExpression with descriptor $desc")
                 }
               }//*/
             )

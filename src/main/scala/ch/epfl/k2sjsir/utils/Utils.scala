@@ -9,6 +9,7 @@ import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{Definitions, Position, Types}
 import org.scalajs.core.ir.ClassKind
 import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
+import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 
 import scala.collection.JavaConverters._
@@ -29,6 +30,19 @@ object Utils {
 
   implicit class CallableDescriptorTranslator(d: CallableDescriptor) {
     def toJsMethodIdent(implicit pos: Position): Ident = encodeMethodIdent(d)
+
+    def toJsBridgeIdent(implicit  pos: Position): Ident = {
+      val clsName = d match {
+        case fd: FunctionDescriptor => Option(fd.getContainingDeclaration.asInstanceOf[ClassDescriptor].toJsClassName)
+      }
+
+      val toReplace = clsName.fold("")(x => x + "__")
+
+      val tmpIdt = d.toJsMethodIdent
+
+      Ident(tmpIdt.name.replaceFirst(toReplace, ""), tmpIdt.originalName)
+    }
+
   }
 
   implicit class ClassDescriptorTranslator(d: ClassDescriptor) {
@@ -43,6 +57,8 @@ object Utils {
     def toJsDefaultImplType(implicit pos: Position): ClassType = ClassType(d.toJsDefaultImplIdent.name)
 
     def toJsClassKind: ClassKind = getClassKind(d.getKind)
+
+    def isInterface: Boolean = d.toJsClassKind == ClassKind.Interface
   }
 
   implicit class ParameterTranslator(d: ParameterDescriptor) {
@@ -80,6 +96,14 @@ object Utils {
     def toJsArrayType: ArrayType = getArrayType(t)
 
     def toJsInternal: String = toInternal(t.toJsType)
+  }
+
+  implicit class KtPropertyHelper(p: KtProperty) {
+    def hasGetterImpl = p.getGetter != null
+
+    def hasSetterImpl = p.isVar && p.getSetter != null
+
+    def hasDefinedAccessors: Boolean = hasGetterImpl || hasSetterImpl
   }
 
   implicit class PropertyAccessor(d: PropertyDescriptor)(implicit pos: Position) {
