@@ -1,9 +1,9 @@
 package ch.epfl.k2sjsir.translate
 
+import ch.epfl.k2sjsir.utils.NameEncoder
 import ch.epfl.k2sjsir.utils.NameEncoder._
 import ch.epfl.k2sjsir.utils.Utils._
-import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
-import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDescriptor, SimpleFunctionDescriptor}
+import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDescriptor, ClassDescriptor, SimpleFunctionDescriptor}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression}
@@ -170,6 +170,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
   private def castJsFunctionApply(jsFuncApply: JSFunctionApply, desc: CallableDescriptor): Tree = {
     val rtpe = desc.getReturnType
     cast(jsFuncApply, rtpe)
+    cast(jsFuncApply, rtpe)
   }
 
   private def isUnaryOp(n: String): Boolean =
@@ -219,14 +220,11 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
     if (null != dispRcvParameter) {
       // We are inside a class declaration
       val cnt = dispRcvParameter.getContainingDeclaration
+      val clsTpe = cnt match {
+        case clsDesc: ClassDescriptor => clsDesc.toJsClassType
+      }
 
-      val className = getFqName(cnt).asString()
-      val suffix =
-        if (DescriptorUtils.isObject(cnt) || DescriptorUtils.isCompanionObject(cnt)) "$"
-        else ""
-      val c = ClassType(encodeClassName(className, suffix))
-
-      val rcv = genThisFromContext(c)
+      val rcv = genThisFromContext(clsTpe)
       Apply(rcv, desc.toJsMethodIdent, receiver :: args)(rtpe)
 
     } else {
@@ -240,8 +238,6 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
       ApplyStatic(clsTpe, desc.toJsMethodIdent, receiver :: args)(rtpe)
     }
   }
-
-  def genCallToInterface() = ???
 
   private def isTopLevelFunction(sf: SimpleFunctionDescriptor) =
     sf.getExtensionReceiverParameter == null && sf.getContainingDeclaration.getName.asString() == "<root>"

@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 
 import scala.collection.JavaConverters._
+import scala.collection.immutable.List
 
 object Utils {
 
@@ -48,17 +49,31 @@ object Utils {
   implicit class ClassDescriptorTranslator(d: ClassDescriptor) {
     def toJsClassName: String = encodeClassFullName(d)
 
+    def toJsDefaultImplName: String = encodeClassFullName(d, kotlinNaming = true)
+
+    def toJsEnumCompanionName: String = encodeClassFullName(d, kotlinNaming = true)
+
     def toJsClassIdent(implicit pos: Position): Ident = encodeClassFullNameIdent(d)
 
     def toJsDefaultImplIdent(implicit pos: Position): Ident = encodeClassFullNameIdent(d, kotlinNaming = true)
 
+    def toJsEnumCompanionIdent(implicit pos: Position): Ident = encodeClassFullNameIdent(d, kotlinNaming = true)
+
     def toJsClassType: ClassType = ClassType(d.toJsClassName)
 
-    def toJsDefaultImplType(implicit pos: Position): ClassType = ClassType(d.toJsDefaultImplIdent.name)
+    def toJsDefaultImplType(implicit pos: Position): ClassType = ClassType(d.toJsDefaultImplName)
+
+    def toJsEnumCompanionType(implicit pos: Position): ClassType = ClassType(d.toJsEnumCompanionName)
 
     def toJsClassKind: ClassKind = getClassKind(d.getKind)
 
     def isInterface: Boolean = d.toJsClassKind == ClassKind.Interface
+
+    def isEnumClass: Boolean = d.getKind == KtClassKind.ENUM_CLASS
+
+    def isEnumEntry: Boolean = d.getKind == KtClassKind.ENUM_ENTRY
+
+    def isJLEnum: Boolean = d.toJsClassType == ClassType("jl_Enum")
   }
 
   implicit class ParameterTranslator(d: ParameterDescriptor) {
@@ -99,9 +114,9 @@ object Utils {
   }
 
   implicit class KtPropertyHelper(p: KtProperty) {
-    def hasGetterImpl = p.getGetter != null
+    def hasGetterImpl: Boolean = p.getGetter != null
 
-    def hasSetterImpl = p.isVar && p.getSetter != null
+    def hasSetterImpl: Boolean = p.isVar && p.getSetter != null
 
     def hasDefinedAccessors: Boolean = hasGetterImpl || hasSetterImpl
   }
@@ -226,7 +241,7 @@ object Utils {
 
   def genThisFromContext(tpe: Type, clsDesc: ClassDescriptor)(implicit pos: Position): Tree = {
     if (clsDesc != null && clsDesc.toJsClassKind == ClassKind.Interface)
-      return VarRef(Ident("$this"))(clsDesc.toJsClassType)
+      VarRef(Ident("$this"))(clsDesc.toJsClassType)
     else
       This()(tpe)
   }
@@ -243,6 +258,42 @@ object Utils {
     }
 
     This()(tpe)
+  }
+
+  def genStructuralEq(lhs: Tree, rhs: Tree)(implicit pos: Position): Tree = {
+
+    val lhsName = Ident(Utils.getFreshName())
+    val rhsName = Ident(Utils.getFreshName())
+
+    val lhsDef = VarDef(lhsName, lhs.tpe, false, lhs)
+    val rhsDef = VarDef(rhsName, rhs.tpe, false, rhs)
+
+    val lhsRef = VarRef(lhsName)(lhs.tpe)
+    val rhsRef = VarRef(rhsName)(rhs.tpe)
+
+    val equalsIdent = Ident("equals__O__Z", Some("equals"))
+
+    val finalIf = If(
+      BinaryOp(
+        BinaryOp.===,
+        lhsRef,
+        Null()
+      ),
+      BinaryOp(
+        BinaryOp.===,
+        rhsRef,
+        Null()
+      ),
+      Apply(lhsRef, equalsIdent, List(rhsRef))(BooleanType)
+    )(BooleanType)
+
+    val block = Block(List(
+      lhsDef,
+      rhsDef,
+      finalIf
+    ))
+
+    block
   }
 
   private def isLambdaType(tpe: KotlinType): Boolean = {
@@ -313,10 +364,12 @@ object Utils {
   private val classKinds = Map(
     KtClassKind.CLASS -> ClassKind.Class,
     KtClassKind.INTERFACE -> ClassKind.Interface,
-    KtClassKind.OBJECT -> ClassKind.ModuleClass
+    KtClassKind.OBJECT -> ClassKind.ModuleClass,
+    KtClassKind.ENUM_CLASS -> ClassKind.Class,
+    KtClassKind.ENUM_ENTRY -> ClassKind.Class
   )
 
-  private def toInternal(t: Type): String = t match {
+  private[utils] def toInternal(t: Type): String = t match {
     case NoType => "V"
     case AnyType => "O"
     case BooleanType => "Z"
@@ -334,6 +387,6 @@ object Utils {
     case _ => throw new Error(s"Unknown Scala.js type: $t")
   }
 
-  val isValueType = Set[Types.Type](IntType, LongType, DoubleType, BooleanType, FloatType)
+  private val isValueType = Set[Types.Type](IntType, LongType, DoubleType, BooleanType, FloatType)
 
 }

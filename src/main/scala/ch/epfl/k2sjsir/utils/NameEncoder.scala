@@ -5,7 +5,6 @@ import org.jetbrains.kotlin.builtins.BuiltInsPackageFragment
 import org.jetbrains.kotlin.descriptors.ClassKind.INTERFACE
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
-import org.jetbrains.kotlin.js.translate.utils.TranslationUtils
 import org.jetbrains.kotlin.load.java.`lazy`.descriptors.LazyJavaPackageFragment
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.DescriptorUtils
@@ -14,7 +13,6 @@ import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyPackageDescriptor
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt.getAllSuperclassesWithoutAny
 import org.jetbrains.kotlin.resolve.source.PsiSourceFile
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.NoType
 import org.scalajs.core.ir.{Definitions, Position}
 
 import scala.collection.JavaConverters._
@@ -65,14 +63,19 @@ object NameEncoder {
         pack.last
     }
 
-    val n = if (name == "kotlin.Any") "java.lang.Object" else name
+    val n = {
+      if (name == "kotlin.Any") "java.lang.Object"
+      else if (name == "kotlin.Enum") "java.lang.Enum"
+      else name
+    }
+
     Definitions.encodeClassName(n + suffix)
   }
 
   private[utils] def encodeClassFullName(d: ClassDescriptor, kotlinNaming: Boolean = false): String = {
     val suffix = {
-      if (isCompanionObject(d) || isObject(d)) "$"
-      else if (kotlinNaming && isInterface(d)) "$DefaultImpls"
+      if (isCompanionObject(d) || isObject(d) || (kotlinNaming && d.isEnumClass)) "$"
+      else if (kotlinNaming && d.isInterface) "$DefaultImpls"
       else ""
     }
 

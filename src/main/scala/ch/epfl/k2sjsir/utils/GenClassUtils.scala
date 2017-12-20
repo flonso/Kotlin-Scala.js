@@ -1,32 +1,45 @@
 package ch.epfl.k2sjsir.utils
 
-import ch.epfl.k2sjsir.translate.{GenDeclaration, GenProperty}
+import ch.epfl.k2sjsir.lower.SJSIRLower
+import ch.epfl.k2sjsir.translate.{GenDeclaration, GenEnumEntry, GenProperty}
+import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
+import org.jetbrains.kotlin.js.translate.utils.BindingUtils.{getFunctionDescriptor, getPropertyDescriptor}
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi._
+import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt
+import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils}
+import org.scalajs.core.ir.{Position, Trees}
 import org.scalajs.core.ir.Trees._
+import org.scalajs.core.ir.Types._
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.List
-import Utils._
-import ch.epfl.k2sjsir.lower.SJSIRLower
-import org.jetbrains.kotlin.js.translate.utils.BindingUtils.{getFunctionDescriptor, getPropertyDescriptor}
-import org.jetbrains.kotlin.lexer.KtTokens
-import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils}
-import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt
-import org.scalajs.core.ir.Position
 
 object GenClassUtils {
 
-  implicit class KtClassOrObjectHelper(clsOrObj: KtClassOrObject)(implicit val c: TranslationContext, pos: Position) {
+  implicit class KtClassOrObjectHelper(clsOrObj: KtClassOrObject)(
+      implicit val c: TranslationContext,
+      pos: Position) {
 
-    private val desc = BindingUtils.getClassDescriptor(c.bindingContext(), clsOrObj)
+    protected val desc = BindingUtils.getClassDescriptor(c.bindingContext(), clsOrObj)
+
+    /* For Enum Classes generation */
+    private val enumName = desc.toJsClassType.className
+
+    private val arrayValuesName = "$VALUES"
+    private val arrayTpe = ArrayType(ArrayTypeRef(enumName, 1))
+
+    private val valueOfName = "valueOf"
+    private val valueOfParamName = "string"
+    private val valuesName = "values"
 
     /**
       * Retrieves a list of all inherited declarations from super interfaces
       *
-      * @return
+      * @return The list of all inherited declarations
       */
     def getInterfaceInheritedDeclarations: List[KtDeclaration] =
       _inheritedDeclarations(DescriptorUtilsKt.getSuperInterfaces(desc).asScala.toList, Set())
@@ -46,7 +59,8 @@ object GenClassUtils {
           case p: KtProperty =>
             BindingUtils.getPropertyDescriptor(c.bindingContext(), p).toJsName
 
-        }.toSet
+        }
+        .toSet
     }
 
     /**
@@ -81,23 +95,26 @@ object GenClassUtils {
       * @return The list of default declarations
       */
     def getDefaultImplementations: List[KtDeclaration] = {
-      clsOrObj.getDeclarations.asScala.collect {
-        case p: KtProperty =>
-          if (desc.isInterface && p.hasDefinedAccessors) List(p)
-          else Nil
+      clsOrObj.getDeclarations.asScala
+        .collect {
+          case p: KtProperty =>
+            if (desc.isInterface && p.hasDefinedAccessors) List(p)
+            else Nil
 
-        case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
-          Nil
+          case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
+            Nil
 
-        case declaration =>
-          if (desc.isInterface) {
-            declaration match {
-              case nf: KtNamedFunction if nf.hasBody => List(declaration)
-              case _ => Nil
-            }
-          } else Nil
+          case declaration =>
+            if (desc.isInterface) {
+              declaration match {
+                case nf: KtNamedFunction if nf.hasBody => List(declaration)
+                case _                                 => Nil
+              }
+            } else Nil
 
-      }.flatten.toList
+        }
+        .flatten
+        .toList
     }
 
     /**
@@ -116,7 +133,7 @@ object GenClassUtils {
         case nf: KtNamedFunction if !desc.isInterface =>
           val methodDef = GenDeclaration(nf).tree match {
 
-            case md@MethodDef(_, name, argsParamDef, resultType, _) =>
+            case md @ MethodDef(_, name, argsParamDef, resultType, _) =>
               val funDesc = BindingUtils.getFunctionDescriptor(c.bindingContext(), nf)
               val clsDesc = DescriptorUtils.getContainingClass(funDesc)
 
@@ -131,7 +148,9 @@ object GenClassUtils {
                 ApplyStatic(defaultImplCls, methodIdent, args)(md.resultType)
               }
 
-              MethodDef(static = false, newName, argsParamDef.tail, resultType, Option(newBody))(OptimizerHints.empty, None)
+              MethodDef(static = false, newName, argsParamDef.tail, resultType, Option(newBody))(
+                OptimizerHints.empty,
+                None)
           }
 
           methodDef
@@ -139,7 +158,8 @@ object GenClassUtils {
     }
 
     /**
-      * Generates all MemberDef for the current class or object
+      * Generates all MemberDef for the current class or object. Enum entries are not handled here
+      * because they should be inside a companion object of the enum class they belong to.
       *
       * Note : KtClassInitializer, KtSecondaryConstructor and KtClassOrObject are skipped because they
       * are all either used in the constructor (for property init) or by the lowering at the top level (nested classes for instance).
@@ -147,20 +167,196 @@ object GenClassUtils {
       *
       * @return A list of MemberDef corresponding to the member class or object declarations
       */
-    def getMemberDefinitions: List[MemberDef] = {
-      clsOrObj.getDeclarations.asScala.collect {
-        case p : KtProperty =>
-          GenProperty(p).withGetterAndSetter.toList
+    def getMemberDefinitions: List[MemberDef] =
+      _memberDefinitions(clsOrObj.getDeclarations.asScala.toList)
 
-        case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
-          Nil /* Skip */
+    /**
+      * Generates all MemberDef for the current EnumClass. These MemberDef should be given to a
+      * companion object definition since the kotlin definitions are static members.
+      *
+      * @return
+      */
+    def getEnumDefinitions: List[Trees.MemberDef] =
+      _memberDefinitions(clsOrObj.getDeclarations.asScala.toList, onlyEnumEntries = true) ++
+        List(_genValueOfFunction) ++ _genValuesFunction
 
-        case declaration =>
-          List(GenDeclaration(declaration).tree)
+    def genEnumCtorIdent(descriptor: ClassDescriptor): Ident = {
+      val primary = Option(descriptor.getUnsubstitutedPrimaryConstructor)
+      val addedSignature = "T__I"
 
-      }.flatten.toList
+      val ident: Ident = {
+        if (primary.nonEmpty) {
+          primary.get.toJsMethodIdent match {
+            case Ident(name, originalName) if !descriptor.isJLEnum =>
+              val separator = if (name.endsWith("_")) "" else "__"
+              val newName = name + separator + addedSignature
+              Ident(newName, originalName)
+
+            case i => i
+          }
+        } else {
+          val newName = s"init___$addedSignature"
+          Ident(newName)
+        }
+      }
+
+      val args: List[Tree] = {
+        val superCall = BindingUtils.getSuperCall(c.bindingContext(), clsOrObj)
+
+        if (primary.nonEmpty)
+          Nil//primary.get.getValueParameters.asScala.map(_.toJsParamDef).toList
+        else
+          Nil
+      }
+
+      ident
     }
 
+    def getEnumCompanionConstructor: MemberDef = {
+      val entries = clsOrObj.getDeclarations.asScala
+      // Initialize the values array --> $VALUES = Array(entries)
+      val elems = entries.collect {
+        case e: KtEnumEntry =>
+          val enumEntryDesc = BindingUtils.getClassDescriptor(c.bindingContext(), e)
+          Select(genThisFromContext(desc.toJsEnumCompanionType), Ident(e.getName))(
+            desc.toJsClassType)
+      }.toList
+      val thisValues = Select(genThisFromContext(desc.toJsEnumCompanionType), Ident(arrayValuesName))(arrayTpe)
+      val valuesArray = Assign(thisValues, ArrayValue(arrayTpe, elems))
+
+      // Call constructor on all entries
+      var enumCardinality = 0
+      val initializations: List[Tree] = clsOrObj.getDeclarations.asScala
+        .collect {
+          case e: KtEnumEntry =>
+            val enumEntryDesc = BindingUtils.getClassDescriptor(c.bindingContext(), e)
+
+            val rcv = genThisFromContext(desc.toJsEnumCompanionType)
+            val ctorIdent = genEnumCtorIdent(desc)
+            val args = Nil ++ List(StringLiteral(e.getName), IntLiteral(enumCardinality))
+            val newCall = New(enumEntryDesc.toJsClassType, ctorIdent, args)
+            val select = Select(rcv, Ident(e.getName))(desc.toJsClassType)
+
+            enumCardinality += 1
+            // this.ENTRY = new Enum$ENTRY(...)
+            List(Assign(select, newCall))
+
+          case _ => Nil
+
+        }
+        .flatten
+        .toList
+
+      val o = ClassType("O")
+      val superCall = ApplyStatically(genThisFromContext(o), o, Ident("init___"), Nil)(NoType)
+
+      val statements = Block(superCall :: initializations ++ List(valuesArray))
+
+      val ctorIdent = Ident("init___")
+
+      MethodDef(static = false, ctorIdent, Nil, NoType, Some(statements))(OptimizerHints.empty,
+                                                                          None)
+    }
+
+    /*
+     * public static MyEnum valueOf(String string) {
+     *   if (string == entry1.toString)
+     *    entry1
+     *   else
+     *     if (string == entry2.toString)
+     *      entry2
+     *     else
+     *      ...
+     * }
+    */
+    private def _genValueOfFunction: MemberDef = {
+      val valueOfFunBody = {
+        val entries = clsOrObj.getDeclarations.asScala.filter(_.isInstanceOf[KtEnumEntry])
+
+        val lhs = VarRef(Ident(valueOfParamName))(ClassType("T"))
+
+        val exceptionMsg = BinaryOp(BinaryOp.String_+, StringLiteral(s"Illegal enum constant ${desc.toJsName}."), lhs)
+        val exception: Tree = Throw(New(ClassType("jl_IllegalStateException"), Ident("init___T"), List(exceptionMsg)))
+
+        entries.foldLeft(exception){ (acc, entry) =>
+          val rhs = StringLiteral(entry.getName)
+          val ret = Select(genThisFromContext(desc.toJsEnumCompanionType, desc), Ident(entry.getName))(desc.toJsClassType)
+
+          val structEq = Apply(lhs, Ident("equals__O__Z"), List(rhs))(BooleanType)
+
+          If(structEq, ret, acc)(desc.toJsClassType)
+        }
+      }
+
+      val args = List(ParamDef(Ident("string"), ClassType("T"), mutable = false, rest = false))
+      val valueOfFun =
+        MethodDef(static = false,
+          Ident(s"${valueOfName}__T__$enumName"),
+          args,
+          desc.toJsClassType,
+          Option(valueOfFunBody))(OptimizerHints.empty, None)
+
+      valueOfFun
+    }
+
+    /*
+     * val $VALUES: LEnumClass[]
+     * def values_ALEnumClass(): LEnumClass[] = {
+     *  this.$VALUES.clone__O().asInstanceOf[ALEnumClass]
+     * }
+     */
+    private def _genValuesFunction: List[MemberDef] = {
+
+      val valuesField = FieldDef(static = false, Ident(arrayValuesName), arrayTpe, mutable = false)
+
+      val valuesFunBody = {
+        AsInstanceOf(Apply(
+          Select(
+            genThisFromContext(desc.toJsEnumCompanionType, desc),
+            Ident(arrayValuesName)
+          )(arrayTpe),
+          Ident(s"clone__O"),
+          Nil
+        )(AnyType), arrayTpe.arrayTypeRef)
+      }
+
+      val valuesFun =
+        MethodDef(static = false,
+          Ident("values__" + toInternal(arrayTpe)),
+          Nil,
+          valuesField.ftpe,
+          Option(valuesFunBody))(OptimizerHints.empty, None)
+
+      List(valuesField, valuesFun)
+
+    }
+
+    private[utils] def _memberDefinitions(declarations: List[KtDeclaration],
+                                          onlyEnumEntries: Boolean = false): List[MemberDef] = {
+
+      def _prop(decl: KtDeclaration) = {
+        if (onlyEnumEntries) decl.isInstanceOf[KtEnumEntry]
+        else !decl.isInstanceOf[KtEnumEntry]
+      }
+
+      declarations
+        .filter(_prop)
+        .collect {
+          case p: KtProperty =>
+            GenProperty(p).withGetterAndSetter
+
+          case e: KtEnumEntry =>
+            GenEnumEntry(e).withGetter
+
+          case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
+            Nil
+
+          case declaration =>
+            List(GenDeclaration(declaration).tree)
+
+        }
+        .flatten
+    }
 
     /**
       * Retrieves the list of all inherited declarations defined in interfaces
@@ -169,43 +365,47 @@ object GenClassUtils {
       * @param acc A set containing all already added declarations (only keep first override)
       * @return A list of declarations
       */
-    private def _inheritedDeclarations(cd: List[ClassDescriptor], acc: Set[String] = Set()): List[KtDeclaration] = cd.flatMap {
-      i => {
-        val file = DescriptorToSourceUtils.getContainingFile(i)
-        val declarations = new SJSIRLower().lower(file)
+    private def _inheritedDeclarations(cd: List[ClassDescriptor],
+                                       acc: Set[String] = Set()): List[KtDeclaration] = cd.flatMap {
+      i =>
+        {
+          val file = DescriptorToSourceUtils.getContainingFile(i)
+          val declarations = new SJSIRLower().lower(file)
 
-        val res = declarations.collect {
-          case d: KtClassOrObject =>
-            val desc = BindingUtils.getClassDescriptor(c.bindingContext(), d)
+          val res = declarations.collect {
+            case d: KtClassOrObject =>
+              val desc = BindingUtils.getClassDescriptor(c.bindingContext(), d)
 
-            if (desc.toJsClassIdent == i.toJsClassIdent)
-              d.getDeclarations.asScala.filter{
-                case p: KtProperty =>
-                  val pDesc = getPropertyDescriptor(c.bindingContext(), p)
-                  !acc.contains(pDesc.toJsName)
+              if (desc.toJsClassIdent == i.toJsClassIdent)
+                d.getDeclarations.asScala.filter {
+                  case p: KtProperty =>
+                    val pDesc = getPropertyDescriptor(c.bindingContext(), p)
+                    !acc.contains(pDesc.toJsName)
 
-                case nf: KtNamedFunction =>
-                  val nfDesc = getFunctionDescriptor(c.bindingContext(), nf)
-                  !acc.contains(nfDesc.toJsBridgeIdent.name)
+                  case nf: KtNamedFunction =>
+                    val nfDesc = getFunctionDescriptor(c.bindingContext(), nf)
+                    !acc.contains(nfDesc.toJsBridgeIdent.name)
 
-                case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
-                  false
-              }
-            else
-              Seq()
+                  case _: KtClassInitializer | _: KtSecondaryConstructor | _: KtClassOrObject =>
+                    false
+                } else
+                Seq()
 
-        }.flatten
+          }.flatten
 
-        res ++ _inheritedDeclarations(DescriptorUtilsKt.getSuperInterfaces(i).asScala.toList, acc ++ res.map{
-          case p: KtProperty =>
-            getPropertyDescriptor(c.bindingContext(), p).toJsName
+          res ++ _inheritedDeclarations(
+            DescriptorUtilsKt.getSuperInterfaces(i).asScala.toList,
+            acc ++ res.map {
+              case p: KtProperty =>
+                getPropertyDescriptor(c.bindingContext(), p).toJsName
 
-          case nf: KtNamedFunction =>
-            val nfDesc = getFunctionDescriptor(c.bindingContext(), nf)
-            nfDesc.toJsBridgeIdent.name
+              case nf: KtNamedFunction =>
+                val nfDesc = getFunctionDescriptor(c.bindingContext(), nf)
+                nfDesc.toJsBridgeIdent.name
 
-        })
-      }
+            }
+          )
+        }
     }
   }
 }

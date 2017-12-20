@@ -66,6 +66,8 @@ object Scalajsld {
   }
 
   def run(args: Array[String]): Unit = {
+    // TODO: Add all options of ScalaJS 1.0 so that the plugin can specify
+    // it inside the build file
     val parser = new scopt.OptionParser[Options]("scalajsld") {
       head("scalajsld", ScalaJSVersions.current)
       arg[File]("<value> ...")
@@ -96,6 +98,7 @@ object Scalajsld {
       val irContainers = FileScalaJSIRContainer.fromClasspath(classpath)
       val moduleInitializers = options.moduleInitializers
 
+      // TODO: For benchmarks run it with semantics optimized in any case
       val semantics =
         if (options.fullOpt) options.semantics.optimized
         else options.semantics

@@ -84,25 +84,13 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
         val explodeOutput = result.split("\n")
         val sb = new StringBuffer()
 
-        sb.append("\nOutput is different: (whitespace is always ignored)")
-        /*
-        sb.append("\noutput: \n")
+        sb.append("\nOutput is different: (whitespace is always ignored)\n")
+        sb.append("\nOutput\n" )
+        sb.append("=========================\n")
         sb.append(result)
-        sb.append("\nexpected output: \n")
+        sb.append("\nExpected output\n" )
+        sb.append("=========================\n")
         sb.append(expected)
-        */
-
-
-        sb.append("Expected output\t\tOutput\n\n=========================\n\n")
-        for (index <- 0 until math.max(explodeExpected.length, explodeOutput.length)) {
-          if (index < explodeExpected.length)
-            sb.append(explodeExpected(index))
-
-          if (index < explodeOutput.length)
-            sb.append("\t\t" + explodeOutput(index))
-
-          sb.append("\n")
-        }
 
         fail(sb.toString)
       }

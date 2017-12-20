@@ -73,10 +73,12 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             val tpe = lv.getType.toJsType
             val ident = Ident(kn.getReferencedNameAsName.toString)
             VarRef(ident)(tpe)
+
           case vd: ValueParameterDescriptor =>
             val tpe = vd.getType.toJsType
             val ident = Ident(kn.getReferencedNameAsName.toString)
             VarRef(ident)(tpe)
+
           case lc: LazyClassDescriptor =>
             val external = if(lc.isCompanionObject) {
               lc.getContainingDeclaration match {
@@ -85,7 +87,13 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
               }
             } else lc.isExternal
             if(external) LoadJSModule(lc.toJsClassType)
-            else LoadModule(lc.toJsClassType)
+            else {
+              if (lc.isEnumClass)
+                LoadModule(lc.toJsEnumCompanionType)
+              else
+                LoadModule(lc.toJsClassType)
+            }
+
           case _ =>
             notImplemented("after KtNameReferenceExpression (default case)")
         }
@@ -94,27 +102,50 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case k: KtBinaryExpression => GenBinary(k).tree
       case k: KtForExpression => GenFor(k).tree
       case k: KtDotQualifiedExpression =>
-        val receiver = GenExpr(k.getReceiverExpression).tree
         val selector = k.getSelectorExpression
-        val isArray = receiver.tpe.isInstanceOf[ArrayType]
 
         selector match {
           case call: KtCallExpression =>
             val rcvExpr = Option(k.getReceiverExpression)
             GenCall(call).withReceiver(rcvExpr)
           case kn: KtNameReferenceExpression =>
-            val tpe = c.bindingContext().getType(kn).toJsType
+            val selectorDesc = BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn)
+
+            val receiver = selectorDesc match {
+              /*
+               * Kotlin IR doesn't store the enum entries or enum functions inside a companion object, therefore we need
+               * to manually load them.
+               */
+              case cd: ClassDescriptor if cd.isEnumEntry =>
+                LoadModule(cd.getContainingDeclaration.asInstanceOf[ClassDescriptor].toJsEnumCompanionType)
+
+              case _ =>
+                GenExpr(k.getReceiverExpression).tree
+
+            }
+            val isArray = receiver.tpe.isInstanceOf[ArrayType]
+
+            val tpe = selectorDesc match {
+              case cd: ClassDescriptor => cd.toJsClassType
+              case _ => BindingUtils.getTypeForExpression(c.bindingContext(), kn).toJsType
+            }
+
             val ao = if(isArray) arrayOps(receiver, tpe, kn.getReferencedName, List()) else None
-            ao.getOrElse(
-              // GenExpr(kn).tree
-              //*
-              {
-                BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
-                  case m: PropertyDescriptor => Apply(receiver, m.getterIdent(), List())(tpe)
-                  case desc => notImplemented(s"after KtDotQualifiedExpression > KtNameReferenceExpression with descriptor $desc")
-                }
-              }//*/
-            )
+            ao.getOrElse {
+              //GenExpr(selector).tree
+              selectorDesc match {
+                case m: PropertyDescriptor => Apply(receiver, m.getterIdent(), List())(tpe)
+                case cls: ClassDescriptor =>
+                  val slctTpe = {
+                    if (cls.isEnumEntry) cls.getContainingDeclaration.asInstanceOf[ClassDescriptor].toJsClassType
+                    else cls.toJsClassType
+                  }
+
+                    Select(receiver, Ident(selectorDesc.getName.asString()))(slctTpe)
+                case desc => notImplemented(s"after KtDotQualifiedExpression > KtNameReferenceExpression with descriptor $desc")
+              }
+            }
+
           case _ =>
             notImplemented("after KtDotQualifiedExpression (default case)")
         }

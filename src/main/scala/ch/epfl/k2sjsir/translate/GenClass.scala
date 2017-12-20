@@ -1,9 +1,8 @@
 package ch.epfl.k2sjsir.translate
 
-import ch.epfl.k2sjsir.SJSIRCodegen
+import ch.epfl.k2sjsir.utils.GenClassUtils
 import ch.epfl.k2sjsir.utils.GenClassUtils._
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
@@ -14,7 +13,7 @@ import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt._
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{ClassType, NoType}
+import org.scalajs.core.ir.Types.{ClassType, IntType, NoType, StringType}
 import org.scalajs.core.ir.{ClassKind, Trees}
 
 import scala.collection.JavaConverters._
@@ -29,9 +28,6 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
   private val superClass = if(desc.isInterface) None else Some(DescriptorUtilsKt.getSuperClassOrAny(desc))
   private val interfaces = getSuperInterfaces(desc).asScala
 
-  // Body abstract = none
-  // Interface superclass = none
-  // Interface interfaces = list !
   override def tree: ClassDef = {
     val idt = desc.toJsClassIdent
     val jsNativeLoadSpec = None
@@ -50,13 +46,53 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       - naming convention : <interface_name>$DefaultImpls
 
     For classes implementing interfaces :
-    - Generate all overriden methods and variables as usual
+    - Generate all overridden methods and variables as usual
     - Generate missing methods (from interfaces) by calling the default implementation of the interfaces
 
-     */
-    val defs : List[MemberDef] = d.getMemberDefinitions
 
-    val bridges = d.getInterfaceBridges
+    For Enum classes :
+      => If it's a ENUM_CLASS
+        - Extends java.lang.Enum
+        - Static initialization of the fields -> create companion object ?
+          For example :
+            public static final /* enum */ MyEnum ONE;
+            public static final /* enum */ MyEnum TWO;
+            public static final /* enum */ MyEnum ZERO;
+            private static final /* synthetic */ MyEnum[] $VALUES;
+
+            static {
+              MyEnum[] arrmyEnum = new MyEnum[3];
+              MyEnum[] arrmyEnum2 = arrmyEnum;
+              arrmyEnum[0] = MyEnum.ONE = new ONE("ONE", 0);
+              arrmyEnum[1] = MyEnum.TWO = new TWO("TWO", 1);
+              arrmyEnum[2] = MyEnum.ZERO = new ZERO("ZERO", 2);
+              $VALUES = arrmyEnum;
+            }
+        - Add a values() function :
+            public static MyEnum[] values() {
+              return (MyEnum[])$VALUES.clone();
+            }
+        - Add a valueOf(string) function :
+            public static MyEnum valueOf(String string) {
+              return Enum.valueOf(MyEnum.class, string);
+            }
+
+        - (Private empty constructor)
+        - One anonymous class per value
+
+      => If it's a ENUM_ENTRY
+        - Standard class extending the ENUM_CLASS
+
+      => For references in the code --> generate a static call to the companion ?
+
+      MyEnum (enum_class)
+        - all standard usual definitions
+      MyEnum$Companion
+        - all static definitions
+      MyEnum$ENTRY (enum_entry)
+        - generated with lowering
+
+     */
 
     /**
       * By default constructor parameters are local to constructor, if they are marked as val we need to create a
@@ -66,7 +102,7 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       val propDesc = getPropertyDescriptorForConstructorParameter(c.bindingContext(), param)
 
       if (propDesc == null)
-        Seq()
+        Nil
       else {
         val isMutable = propDesc.getSetter != null
 
@@ -74,30 +110,74 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
           val name = propDesc.toJsIdent
           val tpe = propDesc.getType.toJsType
 
-          val fd = Seq(FieldDef(static = false, name, tpe, mutable = isMutable))
-          val g = Seq(GenProperty.getter(propDesc))
-          val s = if (isMutable) Seq(GenProperty.setter(propDesc)) else Seq()
+          val fd = List(FieldDef(static = false, name, tpe, mutable = isMutable))
+          val g = List(GenProperty.getter(propDesc))
+          val s = if (isMutable) List(GenProperty.setter(propDesc)) else Nil
 
           fd ++ g ++ s
 
-        } else {
-          Seq()
-        }
+        } else
+          Nil
+
       }
     }.toList
 
     val constructors = genConstructors
-    val allDefs = paramsInit ++ defs ++ bridges ++ constructors
+    val memberDefs = d.getMemberDefinitions
+    val bridges = d.getInterfaceBridges
+
+    val allDefs = paramsInit ++ memberDefs ++ bridges ++ constructors
 
     val sprCls = superClass.fold(None: Option[Trees.Ident])(x => Some(x.toJsClassIdent))
-
-    // Generate SJSIR files if necessary
-    // TODO: Refactor to move this generation to the PackageDeclarationTranslator
-    genDefaultImpls(d.getDefaultImplementations)
 
     val classDef = ClassDef(idt, kind, None, sprCls, interfaces.map(_.toJsClassIdent).toList, None, jsNativeLoadSpec, allDefs, Nil)(optimizerHints)
 
     classDef
+  }
+
+  /**
+    * Creates a new class definition containing static definitions of the default implementations
+    * of the currently compiled interface.
+    * These methods will be called inside the bridges generated in the inheriting classes
+    *
+    * @return A fresh class def containing the default interface implementations
+    */
+  def treeDefaultImpls: Option[ClassDef] = {
+    val impls = d.getDefaultImplementations
+
+    if (impls.isEmpty) return None
+
+    val kind = ClassKind.Class
+    val name = desc.toJsDefaultImplIdent
+    val superClass = Some(Ident("O"))
+
+    val defs: List[MemberDef] = impls.collect {
+      case p: KtProperty =>
+        GenProperty(p).withGetterAndSetter
+
+      case decl =>
+        Seq(GenDeclaration(decl).tree)
+
+    }.flatten
+
+    val classDef = ClassDef(name, kind, None, superClass, List(), None, None, defs, Nil)(OptimizerHints.empty)
+
+    Option(classDef)
+  }
+
+  def treeEnumCompanion: Option[ClassDef] = {
+    if (!desc.isEnumClass) return None
+
+    val defs: List[MemberDef] = d.getEnumDefinitions
+
+    val ctor: MemberDef = d.getEnumCompanionConstructor
+
+    val name = desc.toJsEnumCompanionIdent
+    val superClass = Some(Ident("O"))
+
+    val classDef = ClassDef(name, ClassKind.ModuleClass, None, superClass, List(), None, None, defs ++ List(ctor), Nil)(OptimizerHints.empty)
+
+    Option(classDef)
   }
 
   private def genConstructors : Seq[MethodDef] = {
@@ -155,9 +235,11 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
             Assign(Select(rcv, Ident(p.getName))(propDesc.getType.toJsType), expr)
 
           case i: KtClassInitializer =>
-
             GenBody(i.getBody).tree
+
     }.toList
+
+    val primary = desc.getUnsubstitutedPrimaryConstructor
 
     val superCall = Option(getSuperCall(c.bindingContext(), d)) match {
       case Some(call) =>
@@ -168,36 +250,65 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
         val rcv = genThisFromContext(tpe)
         ApplyStatically(rcv, tpe, name, params.toList)(NoType)
       case None => // We have no superclass, hence we need to call init on Object
-        val o = ClassType("O")
-        ApplyStatically(genThisFromContext(o), o, Ident("init___"), List())(NoType)
+        val (idt, clsTpe, params) = {
+          if (superClass.nonEmpty && superClass.get.toJsClassType != ClassType("O")) {
+            assert(primary != null, "Primary constructor should exists as there is a superclass")
+            val superCls = superClass.get
+
+            val isEnumSpecial = superCls.isEnumClass || superCls.isJLEnum
+
+            val idt = primary.toJsMethodIdent match {
+              case i: Ident =>
+                if(isEnumSpecial)
+                  d.genEnumCtorIdent(superCls)
+                else
+                  i
+            }
+
+            val params = {
+              if(isEnumSpecial)
+                List(VarRef(Ident("_name"))(ClassType("T")), VarRef(Ident("_ordinal"))(IntType))
+              else
+                Nil
+            }
+
+            (idt, superCls.toJsClassType, params)
+
+          } else {
+            val o = ClassType("O")
+            val idt = Ident("init___")
+            (idt, o, Nil)
+
+          }
+        }
+        ApplyStatically(genThisFromContext(clsTpe), clsTpe, idt, params)(NoType)
     }
 
-    val primary = desc.getUnsubstitutedPrimaryConstructor
     if(primary != null) {
-      val args = primary.getValueParameters.asScala.map(_.toJsParamDef).toList
+      val originArgs = primary.getValueParameters.asScala.map(_.toJsParamDef).toList
+      val enumArgs = {
+        if (desc.isEnumClass || desc.isEnumEntry)
+          List(
+            ParamDef(Ident("_name"), ClassType("T"), mutable = false, rest = false),
+            ParamDef(Ident("_ordinal"), IntType, mutable = false, rest = false)
+          )
+        else
+          Nil
+      }
+
+      val args = originArgs ++ enumArgs
+
+      val ctorIdent = primary.toJsMethodIdent match {
+        case i@Ident(name, originalName) =>
+          if (desc.isEnumClass || desc.isEnumEntry)
+            d.genEnumCtorIdent(desc)
+          else
+            i
+      }
 
       val stats = Block(superCall :: paramsInit ++ declsInit)
-      Some(MethodDef(static = false, primary.toJsMethodIdent, args, NoType, Some(stats))(optimizerHints, None))
+      Some(MethodDef(static = false, ctorIdent, args, NoType, Some(stats))(optimizerHints, None))
     } else None
   }
 
-  private def genDefaultImpls(impls: List[KtDeclaration]): Seq[ClassDef] = {
-    if (impls.isEmpty) return Seq()
-
-    val kind = ClassKind.Class
-    val name = desc.toJsDefaultImplIdent
-    val superClass = Some(Ident("O"))
-    val defs: List[MemberDef] = impls.collect {
-      case p: KtProperty => GenProperty(p).withGetterAndSetter
-      case decl => Seq(GenDeclaration(decl).tree)
-    }.flatten
-
-    val classDef = ClassDef(name, kind, None, superClass, List(), None, None, defs, Nil)(OptimizerHints.empty)
-
-    val n = name.name.drop(1).replace("_", "/")
-    val output = c.getConfig.getConfiguration.get(CommonConfigurationKeys.MODULE_NAME)
-    SJSIRCodegen.genIRFile(output, n, classDef)
-
-    Seq(classDef)
-  }
 }

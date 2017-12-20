@@ -48,17 +48,29 @@ final class PackageDeclarationTranslator private(
 
           declaration match {
             case d: KtClassOrObject if !predefinedObject=>
-              val tree = GenClass(d)(context).tree
+              val genClass = GenClass(d)(context)
+
+              val tree = genClass.tree
+              val treeDefaultImpls: Option[ClassDef] = genClass.treeDefaultImpls
+              val treeEnumCompanion: Option[ClassDef] = genClass.treeEnumCompanion
+
               val cd = getClassDescriptor(context.bindingContext(), d)
+
               SJSIRCodegen.genIRFile(output, cd, tree)
+              treeDefaultImpls.foreach(SJSIRCodegen.genIRDefaultImpls(output, cd, _))
+              treeEnumCompanion.foreach(SJSIRCodegen.genIREnumCompanion(output, cd, _))
+
             case d: KtClassOrObject =>
               val tree = GenExternalClass(d)(context).tree
               val cd = getClassDescriptor(context.bindingContext(), d)
               SJSIRCodegen.genIRFile(output, cd, tree)
+
             case f: KtNamedFunction =>
               topLevelFunctions += f
+
             case p: KtProperty =>
               topLevelValues += p
+
             case t => sys.error(s"Not implemented yet: ${t.getClass}")
           }
         }
@@ -82,7 +94,7 @@ final class PackageDeclarationTranslator private(
           }
 
 
-
+          // TODO: Remove after using option mm in Scalajsld (as well as TopLevelModuleExportDef)
           def manualExports(): List[MemberDef] = {
             val args = List(ArrayValue(ArrayType(ArrayTypeRef.of(ClassRef(Definitions.StringClass))), Nil))
             val body = Block(ApplyStatic(ClassType(encodedName), Ident("main__AT__V", Some("main"))(pos), args)(NoType)(pos), Undefined()(pos))(pos)

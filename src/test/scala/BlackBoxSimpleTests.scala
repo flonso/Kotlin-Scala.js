@@ -1,6 +1,21 @@
 
-
 class BlackBoxSimpleTests extends BlackBoxTest {
+  test("TestClasses.kt") {
+    val result =
+      """
+        |ZERO
+        |ONE
+        |ZERO
+        |Exception correctly raised
+        |ONE
+        |Zero is Zero !
+        |42 32 42
+        |Hello World
+      """.stripMargin
+
+    assertExecResult(result, Seq("classes/"), mainClass = "TestClassesKt")
+  }
+
   test("TestInterface.kt") {
     val result =
       """(a = 0 b = Hello World c = Hello World dog = Dog(Rex))

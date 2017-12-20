@@ -138,37 +138,7 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
 
         case AnyType => {
           // See structural equality definition in Kotlin docs
-
-          val lhsName = Ident(Utils.getFreshName())
-          val rhsName = Ident(Utils.getFreshName())
-
-          val lhsDef = VarDef(lhsName, lhs.tpe, false, lhs)
-          val rhsDef = VarDef(rhsName, rhs.tpe, false, rhs)
-
-          val lhsRef = VarRef(lhsName)(lhs.tpe)
-          val rhsRef = VarRef(rhsName)(rhs.tpe)
-
-          val equalsIdent = Ident("equals__O__Z", Some("equals"))
-
-          val finalIf = If(
-            BinaryOp(
-              BinaryOp.===,
-              lhsRef,
-              Null()
-            ),
-            BinaryOp(
-              BinaryOp.===,
-              rhsRef,
-              Null()
-            ),
-            Apply(lhsRef, equalsIdent, List(rhsRef))(BooleanType)
-          )(BooleanType)
-
-          val block = Block(List(
-            lhsDef,
-            rhsDef,
-            finalIf
-          ))
+          val block = Utils.genStructuralEq(lhs, rhs)
 
           if (op == KtTokens.EXCLEQ)
             UnaryOp(UnaryOp.Boolean_!, block)

@@ -43,4 +43,13 @@ object SJSIRCodegen {
     }
   }
 
+  def genIRDefaultImpls(outDir: String, cd: ClassDescriptor, tree: ClassDef): Unit = {
+    val name = cd.toJsDefaultImplName.drop(1).replace("_", "/")
+    genIRFile(outDir, name, tree)
+  }
+
+  def genIREnumCompanion(outDir: String, cd: ClassDescriptor, tree: ClassDef): Unit = {
+    val name: String = cd.toJsEnumCompanionName.drop(1).replace("_", "/")
+    genIRFile(outDir, name, tree)
+  }
 }
