@@ -1,4 +1,4 @@
-class MyObjectClass {
+/*class MyObjectClass {
     companion object MyCompanion {
         val inner = "Hello from a companion object"
     }
@@ -7,4 +7,4 @@ class MyObjectClass {
     object MyObject {
         val inner = "Hello from an object"
     }
-}
+}*/

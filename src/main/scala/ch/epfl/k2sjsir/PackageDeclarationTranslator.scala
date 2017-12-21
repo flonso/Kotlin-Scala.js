@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.js.translate.general.AbstractTranslator
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils._
 import org.jetbrains.kotlin.js.translate.utils.{AnnotationsUtils, BindingUtils}
 import org.jetbrains.kotlin.psi._
+import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{ClassKind, Definitions, Position}
@@ -48,13 +49,16 @@ final class PackageDeclarationTranslator private(
 
           declaration match {
             case d: KtClassOrObject if !predefinedObject=>
+              val cd = getClassDescriptor(context.bindingContext(), d)
+              if (cd.getKind == KtClassKind.ANNOTATION_CLASS)
+                return // Skip annotations... we don't care about them !
+
               val genClass = GenClass(d)(context)
 
               val tree = genClass.tree
               val treeDefaultImpls: Option[ClassDef] = genClass.treeDefaultImpls
               val treeEnumCompanion: Option[ClassDef] = genClass.treeEnumCompanion
 
-              val cd = getClassDescriptor(context.bindingContext(), d)
 
               SJSIRCodegen.genIRFile(output, cd, tree)
               treeDefaultImpls.foreach(SJSIRCodegen.genIRDefaultImpls(output, cd, _))

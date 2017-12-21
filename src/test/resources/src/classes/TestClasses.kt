@@ -24,6 +24,10 @@ fun myEnumTests() {
         println("Zero is Zero !")
     else
         println("Zero is not Zero !?")
+
+    // Test enum with constructor
+    //val tmp = Fruits.BANANA
+    //println(tmp.name)
 }
 
 fun myInheritanceTest() {

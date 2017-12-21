@@ -102,46 +102,41 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case k: KtBinaryExpression => GenBinary(k).tree
       case k: KtForExpression => GenFor(k).tree
       case k: KtDotQualifiedExpression =>
+
+        val receiver = k.getReceiverExpression
+        val receiverExpr = GenExpr(receiver).tree
         val selector = k.getSelectorExpression
 
         selector match {
           case call: KtCallExpression =>
-            val rcvExpr = Option(k.getReceiverExpression)
-            GenCall(call).withReceiver(rcvExpr)
+            val rcvOpt = Option(k.getReceiverExpression)
+            GenCall(call).withReceiver(rcvOpt)
           case kn: KtNameReferenceExpression =>
             val selectorDesc = BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn)
 
-            val receiver = selectorDesc match {
-              /*
-               * Kotlin IR doesn't store the enum entries or enum functions inside a companion object, therefore we need
-               * to manually load them.
-               */
-              case cd: ClassDescriptor if cd.isEnumEntry =>
-                LoadModule(cd.getContainingDeclaration.asInstanceOf[ClassDescriptor].toJsEnumCompanionType)
-
-              case _ =>
-                GenExpr(k.getReceiverExpression).tree
-
-            }
-            val isArray = receiver.tpe.isInstanceOf[ArrayType]
+            val isArray = receiverExpr.tpe.isInstanceOf[ArrayType]
 
             val tpe = selectorDesc match {
               case cd: ClassDescriptor => cd.toJsClassType
               case _ => BindingUtils.getTypeForExpression(c.bindingContext(), kn).toJsType
             }
 
-            val ao = if(isArray) arrayOps(receiver, tpe, kn.getReferencedName, List()) else None
+            val ao = if(isArray) arrayOps(receiverExpr, tpe, kn.getReferencedName, List()) else None
             ao.getOrElse {
               //GenExpr(selector).tree
               selectorDesc match {
-                case m: PropertyDescriptor => Apply(receiver, m.getterIdent(), List())(tpe)
+                case m: PropertyDescriptor =>
+                  Apply(receiverExpr, m.getterIdent(), List())(tpe)
+
                 case cls: ClassDescriptor =>
-                  val slctTpe = {
-                    if (cls.isEnumEntry) cls.getContainingDeclaration.asInstanceOf[ClassDescriptor].toJsClassType
-                    else cls.toJsClassType
+                  if (cls.isEnumEntry) {
+                    val parent = cls.getContainingDeclaration.asInstanceOf[ClassDescriptor]
+
+                    Apply(receiverExpr, Ident(cls.getName().asString() + "__" + parent.toJsClassType.className), Nil)(parent.toJsClassType)
+                  } else {
+                    Select(receiverExpr, Ident(selectorDesc.getName.asString()))(cls.toJsClassType)
                   }
 
-                    Select(receiver, Ident(selectorDesc.getName.asString()))(slctTpe)
                 case desc => notImplemented(s"after KtDotQualifiedExpression > KtNameReferenceExpression with descriptor $desc")
               }
             }

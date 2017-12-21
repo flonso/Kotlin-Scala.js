@@ -12,10 +12,11 @@ case class GenEnumEntry(d: KtEnumEntry)(implicit val c: TranslationContext) exte
 
   val desc = BindingUtils.getClassDescriptor(c.bindingContext(), d)
   val entryIdent = desc.toJsIdent
-  val containingTpe = desc.getContainingDeclaration match {
-    case cd: ClassDescriptor => cd.toJsClassType
+  val containingDesc = desc.getContainingDeclaration  match {
+    case cd: ClassDescriptor => cd
     case x => throw new Exception(s"Unexpected descriptor $x")
   }
+  val containingTpe = containingDesc.toJsClassType
 
   override def tree: FieldDef = FieldDef(static = false, entryIdent, containingTpe, mutable = false)
 
@@ -35,8 +36,8 @@ case class GenEnumEntry(d: KtEnumEntry)(implicit val c: TranslationContext) exte
   }
 
   private def genSelect(implicit pos: Position): Select = {
-    val rcv = genThisFromContext(containingTpe, desc)
+    val rcv = genThisFromContext(containingDesc.toJsEnumCompanionType, desc)
 
-    Select(rcv, entryIdent)(desc.toJsClassType)
+    Select(rcv, entryIdent)(containingTpe)
   }
 }
