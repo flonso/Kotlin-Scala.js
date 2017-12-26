@@ -3,8 +3,9 @@ package ch.epfl.k2sjsir
 import java.{util => ju}
 
 import ch.epfl.k2sjsir.lower.SJSIRLower
-import ch.epfl.k2sjsir.translate.{GenClass, GenExternalClass, GenFun, GenProperty}
+import ch.epfl.k2sjsir.translate._
 import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
+import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.backend.jvm.lower.InterfaceLowering
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
@@ -80,16 +81,22 @@ final class PackageDeclarationTranslator private(
         }
 
         if (topLevelFunctions.nonEmpty || topLevelValues.nonEmpty) {
-          val className = JvmFileClassUtil.getFileClassInfoNoResolve(file).getFileClassFqName.asString()
-          val encodedName = NameEncoder.encodeClassName(className, "")
+          val clsTpe = file.toJsClassType
+          val encodedName = clsTpe.className
+          val className = file.getFileClassName
 
           implicit val pos = Position(Position.SourceFile(file.getName), 0, 0)
 
           val defs = topLevelFunctions.toList.map(x => GenFun(x)(context).tree)
-          val vals = topLevelValues.map(x => GenProperty(x)(context).tree)
-          val receiver = Utils.genThisFromContext(ClassType(encodedName))
+          val vals = topLevelValues.flatMap(x => GenProperty(x)(context).withGetterAndSetter)
+          val receiver = Utils.genThisFromContext(clsTpe)
+
+          val objctSuperCall = ApplyStatically(receiver, ClassType(Definitions.ObjectClass), Ident("init___"), Nil)(NoType)
+          // TODO: Initialize top level variables and values (these should be static?)
+          val ctorBody = Block(objctSuperCall)
           val ctor = MethodDef(false, Ident("init___"), Nil, NoType,
-            Some(ApplyStatically(receiver, ClassType(Definitions.ObjectClass), Ident("init___"), Nil)(NoType)))(OptimizerHints.empty, None)
+            Some(ctorBody))(OptimizerHints.empty, None)
+
           val ctorAndDefs = ctor :: (defs ++ vals)
 
           val hasMain = defs.exists {
@@ -101,7 +108,7 @@ final class PackageDeclarationTranslator private(
           // TODO: Remove after using option mm in Scalajsld (as well as TopLevelModuleExportDef)
           def manualExports(): List[MemberDef] = {
             val args = List(ArrayValue(ArrayType(ArrayTypeRef.of(ClassRef(Definitions.StringClass))), Nil))
-            val body = Block(ApplyStatic(ClassType(encodedName), Ident("main__AT__V", Some("main"))(pos), args)(NoType)(pos), Undefined()(pos))(pos)
+            val body = Block(ApplyStatic(clsTpe, Ident("main__AT__V", Some("main"))(pos), args)(NoType)(pos), Undefined()(pos))(pos)
             val main = MethodDef(static = false, StringLiteral("main")(pos), Nil, AnyType, Some(body))(OptimizerHints.empty, None)(pos)
             List(main)
           }
@@ -111,7 +118,7 @@ final class PackageDeclarationTranslator private(
               Ident(encodedName)(pos),
               ClassKind.ModuleClass,
               None,
-              Some(Ident("O")(pos)),
+              Some(Ident(Definitions.ObjectClass)(pos)),
               List(),
               None,
               None,

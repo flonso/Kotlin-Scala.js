@@ -1,16 +1,16 @@
 package ch.epfl.k2sjsir.translate
 
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.descriptors.{ClassKind, PropertyDescriptor, PropertyGetterDescriptor, PropertySetterDescriptor}
+import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
-import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 import org.jetbrains.kotlin.psi.{KtProperty, KtPropertyAccessor}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
+import org.jetbrains.kotlin.types.KotlinType
 import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{AnyType, NoType, StringType, Type}
+import org.scalajs.core.ir.Types.NoType
 
 case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extends IRNodeGen[KtProperty, FieldDef] {
 
@@ -54,6 +54,8 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
     3. In GenClass create a DefaultImpls file containing all defined implementations
      */
 
+    setProp(d)
+
     val g = List(getter(d, isAbstract))
 
     val s = if (d.isVar) List(setter(d, isAbstract)) else Nil
@@ -63,6 +65,11 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
 }
 
 object GenProperty {
+  var prop: Option[KtProperty] = None
+
+  private def setProp(p: KtProperty): Unit = {
+    prop = Option(p)
+  }
 
   /**
     * If no getter was defined, generates the default implementation.
@@ -91,10 +98,12 @@ object GenProperty {
     assert(propGetterDesc != null)
 
     val rtpe = desc.getReturnType.toJsType
-    val tpe = desc.getDispatchReceiverParameter.getType
-    val cd = DescriptorUtils.getClassDescriptorForType(tpe)
+    val dispatchReceiver = Option(desc.getDispatchReceiverParameter)
+    val tpe = dispatchReceiver.fold(null: KotlinType)(dr => dr.getType)
+    val cd = dispatchReceiver.fold(null: ClassDescriptor)(_ => DescriptorUtils.getClassDescriptorForType(tpe))
+
     val methodIdent = propGetterDesc.toJsMethodIdent
-    val static = isInterface(cd)
+    val static = cd != null && isInterface(cd)
 
     val body = {
       if (!isAbstract) {
@@ -111,7 +120,7 @@ object GenProperty {
 
     // FIXME: Dirty hack to pass instance of interface to the default implementation
     val args = {
-      if (isInterface(cd))
+      if (cd != null && isInterface(cd))
         List(ParamDef(Ident("$this"), cd.toJsClassType, false, false))
       else
         Nil
@@ -135,23 +144,25 @@ object GenProperty {
     assert(propGetterDesc != null)
 
     val rtpe = NoType // Kotlin setters always return Unit
+    val isStatic = false
     val propTpe = desc.getType.toJsType
     val methodIdent = propGetterDesc.toJsMethodIdent
     val setterIdent = Ident(s"value")
     val params = List(ParamDef(setterIdent, desc.getType.toJsType, mutable = false, rest = false))
+
     val body = {
       if (!isAbstract) {
         if (propAccessor != null && propAccessor.hasBody)
           Option(GenBody(propAccessor.getBodyExpression).tree)
-        else {
+        else
           Some(Assign(genSelectForAccessor(desc), VarRef(setterIdent)(propTpe)))
-        }
-      } else {
+
+      } else
         None
-      }
+
     }
 
-    MethodDef(static = false, methodIdent, params, rtpe, body)(OptimizerHints.empty, None)
+    MethodDef(static = isStatic, methodIdent, params, rtpe, body)(OptimizerHints.empty, None)
   }
 
   private def setter(p: KtProperty, isAbstract: Boolean = false)(implicit c: TranslationContext, pos: Position): MethodDef = {
@@ -177,13 +188,21 @@ object GenProperty {
     * @param pos
     * @return
     */
-  private def genSelectForAccessor(desc: PropertyDescriptor)(implicit pos: Position): Select = {
-
-    val tpe = desc.getDispatchReceiverParameter.getType
-    val clsTpe = DescriptorUtils.getClassDescriptorForType(tpe).toJsClassType
+  private def genSelectForAccessor(desc: PropertyDescriptor)(implicit pos: Position): Tree = {
+    val ident = desc.toJsIdent
     val slctTpe = desc.getType.toJsType
-    val rcv = genThisFromContext(clsTpe, desc)
 
-    Select(rcv, desc.toJsIdent)(slctTpe)
+    val clsTpe = if (!desc.isRootPackage) {
+      val tpe = desc.getDispatchReceiverParameter.getType
+      DescriptorUtils.getClassDescriptorForType(tpe).toJsClassType
+
+    } else {
+      val file = prop.getOrElse(throw new Exception("Declaration is in root package, you must set the KtProperty before the call")).getContainingKtFile
+      file.toJsClassType
+    }
+
+    val rcv = genThisFromContext(clsTpe, desc)
+    Select(rcv, ident)(slctTpe)
+
   }
 }

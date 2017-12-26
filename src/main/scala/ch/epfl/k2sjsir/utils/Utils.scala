@@ -9,7 +9,8 @@ import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{Definitions, Position, Types}
 import org.scalajs.core.ir.ClassKind
 import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
-import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
+import org.jetbrains.kotlin.psi.{KtFile, KtProperty}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 
 import scala.collection.JavaConverters._
@@ -27,6 +28,7 @@ object Utils {
     def toJsIdent(implicit pos: Position): Ident = Ident(d.toJsName, Some(name))
 
     def toJsClosureIdent(implicit pos: Position): Ident = Ident(d.toJsClosureName, Some(name))
+
   }
 
   implicit class CallableDescriptorTranslator(d: CallableDescriptor) {
@@ -43,6 +45,8 @@ object Utils {
 
       Ident(tmpIdt.name.replaceFirst(toReplace, ""), tmpIdt.originalName)
     }
+
+    def isRootPackage: Boolean = d.getContainingDeclaration.toJsName == "root"
 
   }
 
@@ -123,6 +127,14 @@ object Utils {
 
   implicit class PropertyAccessor(d: PropertyDescriptor)(implicit pos: Position) {
     def getterIdent(): Ident = NameEncoder.encodeMethodIdent(d)
+  }
+
+  implicit class TopLevelHelper(f: KtFile) {
+    private val clsName =  JvmFileClassUtil.getFileClassInfoNoResolve(f).getFileClassFqName.asString()
+
+    def toJsClassType: ClassType = ClassType(encodeClassName(clsName, ""))
+
+    def getFileClassName = clsName
   }
 
   def getName(tpe: KotlinType): String = {

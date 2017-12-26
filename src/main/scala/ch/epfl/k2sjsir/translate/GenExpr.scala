@@ -4,6 +4,7 @@ import ch.epfl.k2sjsir.utils.NameEncoder
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
+import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi._
@@ -40,10 +41,24 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
           case m: PropertyDescriptor =>
             val tpe = m.getType.toJsType
-            val recv = getClassDescriptorForType(m.getDispatchReceiverParameter.getValue.getType)
-            val isObj = recv.isCompanionObject || DescriptorUtils.isObject(recv)
+            val dispatchReceiver = m.getDispatchReceiverParameter
+            val recv = {
+              if (dispatchReceiver != null)
+                getClassDescriptorForType(dispatchReceiver.getValue.getType)
+              else
+                null
+            }
+            val isObj = recv != null && (recv.isCompanionObject || DescriptorUtils.isObject(recv))
 
-            if(isObj)
+            if(m.isRootPackage) {
+              val name = JvmFileClassUtil.getFileClassInfoNoResolve(d.getContainingKtFile).getFileClassFqName.asString()
+              val encodedName = NameEncoder.encodeClassName(name, "")
+
+              val clsTpe = ClassType(encodedName)
+
+              ApplyStatic(clsTpe, m.getterIdent(), Nil)(m.getType.toJsType)
+            }
+            else if(isObj)
               Apply(LoadModule(recv.toJsClassType), m.getterIdent(), List())(tpe)
             else if(DescriptorUtils.isLocal(m))
               VarRef(m.toJsIdent)(recv.toJsClassType)
@@ -94,8 +109,8 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                 LoadModule(lc.toJsClassType)
             }
 
-          case _ =>
-            notImplemented("after KtNameReferenceExpression (default case)")
+          case t =>
+            notImplemented(s"after KtNameReferenceExpression (default case) $t")
         }
       case k: KtConstantExpression => GenConst(k).tree
       case k: KtArrayAccessExpression => GenArrayAccess(k).tree
@@ -103,7 +118,9 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case k: KtForExpression => GenFor(k).tree
       case k: KtDotQualifiedExpression =>
 
+        // (MyObjectClass.MyObject.MyOtherObject).inner
         val receiver = k.getReceiverExpression
+        // If it's an object/module gen a module load
         val receiverExpr = GenExpr(receiver).tree
         val selector = k.getSelectorExpression
 
@@ -172,19 +189,25 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
           case f: FunctionDescriptor => genClosure(f)
           case _ => notImplemented()
         }
+
       case l: KtLambdaExpression => genLambda(l)
       case w: KtWhileExpression =>
         val body = GenBody(w.getBody).tree
         val cond = GenExpr(w.getCondition).tree
         While(cond, body)
+
       case k: KtIsExpression => GenIs(k).tree
       case k: KtThisExpression =>
         val tpe = c.bindingContext().getType(k)
         val desc = getClassDescriptorForType(tpe)
 
         genThisFromContext(tpe.toJsType, desc)
-      case _ =>
-        notImplemented("default case on tree")
+
+      case b: KtBlockExpression =>
+        GenBody(b).tree
+
+      case t =>
+        notImplemented(s"default case on tree, element was of type $t")
     }
   }
 

@@ -1,5 +1,7 @@
 
 fun hello() : Unit = println("Hello World")
+val myVal = "A top-level value"
+var myVar = "A top-level variable"
 
 class TopLevelCaller {
     fun call() {
@@ -15,4 +17,11 @@ fun main(args: Array<String>) {
 
     hello()
     welcome("Kotlin")
+    /*
+    // FIXME: Cannot call the top-level properties yet
+    println(myVal)
+    println(myVar)
+    myVar = "My top-level variable"
+    println(myVar)
+    */
 }

@@ -1,8 +1,10 @@
 package ch.epfl.k2sjsir.translate
 
+import ch.epfl.k2sjsir.utils.NameEncoder
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.impl.{LocalVariableDescriptor, SyntheticFieldDescriptor}
 import org.jetbrains.kotlin.descriptors.{ClassDescriptor, DeclarationDescriptor, PropertyDescriptor}
+import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.reference.{AccessTranslationUtils, ArrayAccessTranslator, BackingFieldAccessTranslator, VariableAccessTranslator}
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils._
@@ -13,7 +15,7 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ClassValueReceiver, ExpressionReceiver, ImplicitClassReceiver, ThisClassReceiver}
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{IntType, NoType}
+import org.scalajs.core.ir.Types.{ClassType, IntType, NoType}
 
 
 case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) extends Gen[KtBinaryExpression] {
@@ -39,18 +41,35 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
                 case cl: ThisClassReceiver => genThisFromContext(cl.getType.toJsType, p)
                 case cl: ClassValueReceiver => GenExpr(cl.getExpression).tree
                 case e: ExpressionReceiver => GenExpr(e.getExpression).tree
+                case _ if p.isRootPackage => null // Receiver is not used later in this case
                 case _ => notImplemented("Unhandled receiver type (from PropertyDescriptor)")
               }
+
+              val methodIdent = p.getSetter.toJsMethodIdent
+              val callRtpe = NoType
 
               val ret = d.getOperationToken match {
                 case KtTokens.PLUSEQ | KtTokens.MINUSEQ | KtTokens.MULTEQ | KtTokens.DIVEQ | KtTokens.PERCEQ =>
                   val code = d.getOperationToken.toString.replaceAll("[T]?EQ", "")
                   val binOp = GenBinary.getBinaryOp(code, tpe)
                   val args = BinaryOp(binOp, Apply(receiver, p.getGetter.toJsMethodIdent, List())(tpe), right)
-                  Apply(receiver, p.getSetter.toJsMethodIdent, List(args))(NoType)
+
+                  if (p.isRootPackage) {
+                    val clsTpe = d.getContainingKtFile.toJsClassType
+                    ApplyStatic(clsTpe, methodIdent, List(args))(callRtpe)
+
+                  }
+                  else
+                    Apply(receiver, methodIdent, List(args))(callRtpe)
 
                 case KtTokens.EQ =>
-                  Apply(receiver, p.getSetter.toJsMethodIdent, List(right))(NoType)
+                  if (p.isRootPackage) {
+                    val clsTpe = d.getContainingKtFile.toJsClassType
+                    ApplyStatic(clsTpe, methodIdent, List(right))(callRtpe)
+
+                  }
+                  else
+                    Apply(receiver, methodIdent, List(right))(callRtpe)
               }
 
               ret
