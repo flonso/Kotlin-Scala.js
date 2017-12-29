@@ -1,6 +1,6 @@
 package ch.epfl.k2sjsir.translate
 
-import ch.epfl.k2sjsir.utils.NameEncoder
+import ch.epfl.k2sjsir.utils.{GenExprUtils, NameEncoder}
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
@@ -116,51 +116,12 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case k: KtArrayAccessExpression => GenArrayAccess(k).tree
       case k: KtBinaryExpression => GenBinary(k).tree
       case k: KtForExpression => GenFor(k).tree
+      case k: KtSafeQualifiedExpression =>
+        // receiver?.selector => if (receiver != null) receiver.selector else null
+        GenExprUtils.genDotQualified(k, notImplemented)
       case k: KtDotQualifiedExpression =>
+        GenExprUtils.genDotQualified(k, notImplemented)
 
-        // (MyObjectClass.MyObject.MyOtherObject).inner
-        val receiver = k.getReceiverExpression
-        // If it's an object/module gen a module load
-        val receiverExpr = GenExpr(receiver).tree
-        val selector = k.getSelectorExpression
-
-        selector match {
-          case call: KtCallExpression =>
-            val rcvOpt = Option(k.getReceiverExpression)
-            GenCall(call).withReceiver(rcvOpt)
-          case kn: KtNameReferenceExpression =>
-            val selectorDesc = BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn)
-
-            val isArray = receiverExpr.tpe.isInstanceOf[ArrayType]
-
-            val tpe = selectorDesc match {
-              case cd: ClassDescriptor => cd.toJsClassType
-              case _ => BindingUtils.getTypeForExpression(c.bindingContext(), kn).toJsType
-            }
-
-            val ao = if(isArray) arrayOps(receiverExpr, tpe, kn.getReferencedName, List()) else None
-            ao.getOrElse {
-              //GenExpr(selector).tree
-              selectorDesc match {
-                case m: PropertyDescriptor =>
-                  Apply(receiverExpr, m.getterIdent(), List())(tpe)
-
-                case cls: ClassDescriptor =>
-                  if (cls.isEnumEntry) {
-                    val parent = cls.getContainingDeclaration.asInstanceOf[ClassDescriptor]
-
-                    Apply(receiverExpr, Ident(cls.getName().asString() + "__" + parent.toJsClassType.className), Nil)(parent.toJsClassType)
-                  } else {
-                    Select(receiverExpr, Ident(selectorDesc.getName.asString()))(cls.toJsClassType)
-                  }
-
-                case desc => notImplemented(s"after KtDotQualifiedExpression > KtNameReferenceExpression with descriptor $desc")
-              }
-            }
-
-          case _ =>
-            notImplemented("after KtDotQualifiedExpression (default case)")
-        }
       case k: KtUnaryExpression => GenUnary(k).tree
       case k: KtTryExpression =>
         val content = GenBody(k.getTryBlock).tree
@@ -176,13 +137,16 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         if (fnl.nonEmpty) TryFinally(tc, fnl.get) else tc
       case k: KtThrowExpression => Throw(GenExpr(k.getThrownExpression).tree)
       case k: KtIfExpression =>
+        val ifTpe = BindingUtils.getTypeForExpression(c.bindingContext(), k).toJsType
+
         val cond = GenExpr(k.getCondition).tree
         val thenB = GenExpr(k.getThen).tree
         val elseB = Option(k.getElse).map(x => GenExpr(x).tree)
-        If(cond, thenB, elseB.getOrElse(Skip()))(thenB.tpe)
+
+        If(cond, thenB, elseB.getOrElse(Skip()))(ifTpe)
+
       case k: KtReturnExpression => Return(GenExpr(k.getReturnedExpression).tree)
       case k: KtWhenExpression => GenWhen(k).tree
-      case k: KtSafeQualifiedExpression => notImplemented()
       case kp: KtParenthesizedExpression => GenExpr(kp.getExpression).tree
       case kc: KtCallableReferenceExpression =>
         CallUtilKt.getResolvedCall(kc.getCallableReference, c.bindingContext()).getResultingDescriptor match {
@@ -206,24 +170,11 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case b: KtBlockExpression =>
         GenBody(b).tree
 
+      case f: KtNamedFunction =>
+        notImplemented("Function declarations are not supported inside other functions")
+
       case t =>
         notImplemented(s"default case on tree, element was of type $t")
-    }
-  }
-
-  private def arrayOps(receiver: Tree, tpe: Type, method: String, args: List[Tree]) : Option[Tree] = {
-    method match {
-      case "get" =>
-        require(args.size == 1)
-        Some(ArraySelect(receiver, args.head)(tpe))
-      case "set" =>
-        require(args.size == 2)
-        Some(Assign(ArraySelect(receiver, args.head)(args(1).tpe), args(1)))
-      case "size" =>
-        Some(ArrayLength(receiver))
-      case "iterator" =>
-        None
-      case _ => None
     }
   }
 

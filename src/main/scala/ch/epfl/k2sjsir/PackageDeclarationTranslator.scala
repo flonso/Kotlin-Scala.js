@@ -113,8 +113,7 @@ final class PackageDeclarationTranslator private(
             List(main)
           }
 
-          val cls =
-            ClassDef(
+          val cls = ClassDef(
               Ident(encodedName)(pos),
               ClassKind.ModuleClass,
               None,

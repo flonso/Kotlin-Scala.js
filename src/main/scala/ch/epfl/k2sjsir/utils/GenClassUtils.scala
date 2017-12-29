@@ -370,6 +370,11 @@ object GenClassUtils {
       i =>
         {
           val file = DescriptorToSourceUtils.getContainingFile(i)
+
+          // FIXME: File can be null sometimes... Comparable for instance has no source file
+          if (file == null)
+            return Nil
+
           val declarations = new SJSIRLower().lower(file)
 
           val res = declarations.collect {

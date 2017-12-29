@@ -12,12 +12,13 @@ import org.jetbrains.kotlin.js.backend.ast.metadata.MetadataProperties
 import org.jetbrains.kotlin.js.config.{JSConfigurationKeys, JsConfig}
 import org.jetbrains.kotlin.js.facade.MainCallParameters
 import org.jetbrains.kotlin.js.facade.exceptions.{TranslationException, TranslationRuntimeException, UnsupportedFeatureException}
+import org.jetbrains.kotlin.js.sourceMap.SourceFilePathResolver
 import org.jetbrains.kotlin.js.translate.callTranslator.CallTranslator
 import org.jetbrains.kotlin.js.translate.context.{Namer, StaticContext, TranslationContext}
 import org.jetbrains.kotlin.js.translate.expression.{ExpressionVisitor, PatternTranslator}
 import org.jetbrains.kotlin.js.translate.general.{AstGenerationResult, Merger}
 import org.jetbrains.kotlin.js.translate.general.ModuleWrapperTranslation.wrapIfNecessary
-import org.jetbrains.kotlin.js.translate.test.{JSTestGenerator}
+import org.jetbrains.kotlin.js.translate.test.JSTestGenerator
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils.getFunctionDescriptor
 import org.jetbrains.kotlin.js.translate.utils.{JsAstUtils, TranslationUtils}
 import org.jetbrains.kotlin.js.translate.utils.JsAstUtils.{convertToStatement, toStringLiteralList}
@@ -183,9 +184,9 @@ object Translation {
   }
 
   @throws[TranslationException]
-  def generateAst(bindingTrace: BindingTrace, files: ju.Collection[KtFile], mainCallParameters: MainCallParameters, moduleDescriptor: ModuleDescriptor, config: JsConfig): AstGenerationResult =
+  def generateAst(bindingTrace: BindingTrace, files: ju.Collection[KtFile], mainCallParameters: MainCallParameters, moduleDescriptor: ModuleDescriptor, config: JsConfig, pathResolver: SourceFilePathResolver): AstGenerationResult =
     try
-      doGenerateAst(bindingTrace, files, mainCallParameters, moduleDescriptor, config)
+      doGenerateAst(bindingTrace, files, mainCallParameters, moduleDescriptor, config, pathResolver)
     catch {
       case e: UnsupportedOperationException =>
         throw new UnsupportedFeatureException("Unsupported feature used.", e)
@@ -197,9 +198,10 @@ object Translation {
                             files: ju.Collection[KtFile],
                             mainCallParameters: MainCallParameters,
                             moduleDescriptor: ModuleDescriptor,
-                            config: JsConfig): AstGenerationResult = {
+                            config: JsConfig,
+                            pathResolver: SourceFilePathResolver): AstGenerationResult = {
 
-    val staticContext = new StaticContext(bindingTrace, config, moduleDescriptor)
+    val staticContext = new StaticContext(bindingTrace, config, moduleDescriptor, pathResolver)
     val program = staticContext.getProgram
     val rootFunction = new JsFunction(program.getRootScope, new JsBlock(), "root function")
     val internalModuleName = program.getScope.declareName("_")

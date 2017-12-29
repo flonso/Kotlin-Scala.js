@@ -100,7 +100,7 @@ object NameEncoder {
     val stringName = d.getName.asString()
     val name = encodeMemberNameInternal(stringName)
     def privateSuffix(cl: Option[ClassDescriptor]) = cl.fold("") { c =>
-      if (c.getKind == INTERFACE && !c.isImpl) encodeClassFullName(c)
+      if (c.getKind == INTERFACE && !c.isActual) encodeClassFullName(c)
       else
         getAllSuperclassesWithoutAny(c).asScala
           .count(_.getKind != INTERFACE)

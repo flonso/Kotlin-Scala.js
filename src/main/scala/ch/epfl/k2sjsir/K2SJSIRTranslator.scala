@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.js.facade.exceptions.TranslationException
 import org.jetbrains.kotlin.js.facade.{MainCallParameters, TranslationResult, TranslationUnit}
 import org.jetbrains.kotlin.js.inline.JsInliner
 import org.jetbrains.kotlin.js.inline.clean.{RemoveUnusedImportsKt, ResolveTemporaryNamesKt}
+import org.jetbrains.kotlin.js.sourceMap.SourceFilePathResolver
 import org.jetbrains.kotlin.js.translate.utils.ExpandIsCallsKt.expandIsCalls
 import org.jetbrains.kotlin.progress.ProgressIndicatorAndCompilationCanceledStatus
 import org.jetbrains.kotlin.psi.KtFile
@@ -56,7 +57,8 @@ final class K2SJSIRTranslator(val config: JsConfig) {
 
     val diagnostics = bindingTrace.getBindingContext.getDiagnostics
 
-    val translationResult = Translation.generateAst(bindingTrace, files, parameters, moduleDescriptor, config)
+    val pathResolver = SourceFilePathResolver.create(config)
+    val translationResult = Translation.generateAst(bindingTrace, files, parameters, moduleDescriptor, config, pathResolver)
     ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
     if (hasError(diagnostics))
       return new TranslationResult.Fail(diagnostics)

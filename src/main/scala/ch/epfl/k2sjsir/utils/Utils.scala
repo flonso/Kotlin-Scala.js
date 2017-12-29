@@ -6,12 +6,12 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.types.{KotlinType, TypeUtils}
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types._
-import org.scalajs.core.ir.{Definitions, Position, Types}
-import org.scalajs.core.ir.ClassKind
+import org.scalajs.core.ir.{ClassKind, Definitions, Position, Types}
 import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.psi.{KtFile, KtProperty}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.scalajs.core.ir
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.List
@@ -147,6 +147,15 @@ object Utils {
     else getFqName(desc).asString()
   }
 
+  def getTypeForIs(tpe: String): TypeRef = tpe match {
+    case "I" => ClassRef(Definitions.BoxedIntegerClass)
+    case "D" => ClassRef(Definitions.BoxedDoubleClass)
+    case "F" => ClassRef(Definitions.BoxedFloatClass)
+    case "Z" => ClassRef(Definitions.BoxedBooleanClass)
+    case "J" => ClassRef(Definitions.BoxedLongClass)
+    case other => ClassRef(other)
+  }
+
   def getFreshName(prefix: String = "x$"): String = {
     prefix + java.util.UUID.randomUUID().toString.replaceAllLiterally("-", "")
   }
@@ -169,7 +178,6 @@ object Utils {
     }
   }
 
-
   private def getType(tpe: KotlinType, isVararg: Boolean = false): Type = {
     if (isLambdaType(tpe)) AnyType
     else {
@@ -178,8 +186,15 @@ object Utils {
         case typeRef: ArrayTypeRef => ArrayType(typeRef)
       }
 
-      types.getOrElse(getName(tpe), ret)
+      val nullable = TypeUtils.isNullableType(tpe)
+      val suffix = if (nullable) "?" else ""
+
+      types.getOrElse(getName(tpe) + suffix, ret)
     }
+  }
+
+  def nullableToNonNullable(tpe: KotlinType): KotlinType = {
+    tpe.getConstructor.getDeclarationDescriptor.getDefaultType
   }
 
   def adaptPrimitive(value: Tree, to: Type)(
@@ -214,7 +229,7 @@ object Utils {
         case DoubleType => value
         case FloatType  => UnaryOp(FloatToDouble, value)
         case LongType   => UnaryOp(LongToDouble, value)
-        case _                => UnaryOp(IntToDouble, intValue)
+        case _          => UnaryOp(IntToDouble, intValue)
       }
 
       (to: @unchecked) match {
@@ -286,16 +301,8 @@ object Utils {
     val equalsIdent = Ident("equals__O__Z", Some("equals"))
 
     val finalIf = If(
-      BinaryOp(
-        BinaryOp.===,
-        lhsRef,
-        Null()
-      ),
-      BinaryOp(
-        BinaryOp.===,
-        rhsRef,
-        Null()
-      ),
+      genNullCond(lhsRef),
+      genNullCond(rhsRef),
       Apply(lhsRef, equalsIdent, List(rhsRef))(BooleanType)
     )(BooleanType)
 
@@ -308,15 +315,38 @@ object Utils {
     block
   }
 
+  def genNullCond(t: Tree)(implicit pos: Position): Tree = {
+    BinaryOp(
+      BinaryOp.===,
+      t,
+      Null()
+    )
+  }
+
+  def genNotNullCond(t: Tree)(implicit pos: Position): Tree = {
+    BinaryOp(
+      BinaryOp.!==,
+      t,
+      Null()
+    )
+  }
+
   private def isLambdaType(tpe: KotlinType): Boolean = {
     tpe.toString.matches("Function[0-9]+.*")
   }
 
   private def getTypeRef(tpe: KotlinType): TypeRef = {
+    val suffix = if (TypeUtils.isNullableType(tpe)) "?" else ""
     val name = getName(tpe)
     if (name == "kotlin.Array" || arrayTypes.contains(name)) getArrayTypeRef(tpe)
     else if (name.startsWith("kotlin.Function")) getFunctionType(name)
-    else ClassRef(toInternal(types.getOrElse(name, getClassType(tpe))))
+    else ClassRef(toInternal(types.getOrElse(name + suffix, getClassType(tpe))))
+  }
+
+  private def getTypeRef(tpe: Type): TypeRef = tpe match {
+    case ClassType(name) => ClassRef(name)
+    case ArrayType(arrayTypeRef) => arrayTypeRef
+    case t => ClassRef(toInternal(t))
   }
 
   private def getFunctionType(name: String): TypeRef = {
@@ -360,9 +390,9 @@ object Utils {
     "kotlin.Unit" -> NoType,
     "kotlin.Nothing" -> NothingType,
     "kotlin.Boolean" -> BooleanType,
-    "kotlin.Char" -> IntType,
-    "kotlin.Byte" -> IntType,
-    "kotlin.Short" -> IntType,
+    "kotlin.Char" -> CharType,
+    "kotlin.Byte" -> ByteType,
+    "kotlin.Short" -> ShortType,
     "kotlin.Int" -> IntType,
     "kotlin.Float" -> FloatType,
     "kotlin.Long" -> LongType,
@@ -370,7 +400,32 @@ object Utils {
     "kotlin.Null" -> NullType,
     "kotlin.String" -> ClassType(Definitions.StringClass),
     "kotlin.Throwable" -> AnyType,
-    "kotlin.Comparable" -> AnyType
+    "kotlin.Comparable" -> AnyType,
+
+    "kotlin.Any?" -> AnyType,
+    "kotlin.Boolean?" -> ClassType(Definitions.BoxedBooleanClass),
+    "kotlin.Char?" -> ClassType(Definitions.BoxedCharacterClass),
+    "kotlin.Byte?" -> ClassType(Definitions.BoxedByteClass),
+    "kotlin.Short?" -> ClassType(Definitions.BoxedShortClass),
+    "kotlin.Int?" -> ClassType(Definitions.BoxedIntegerClass),
+    "kotlin.Float?" -> ClassType(Definitions.BoxedFloatClass),
+    "kotlin.Long?" -> ClassType(Definitions.BoxedLongClass),
+    "kotlin.Double?" -> ClassType(Definitions.BoxedDoubleClass),
+    "kotlin.String?" -> ClassType(Definitions.StringClass),
+    "kotlin.Throwable?" -> AnyType,
+    "kotlin.Comparable?" -> AnyType
+
+  )
+
+  private val boxedToPrimitive = Map(
+    ClassType(Definitions.BoxedBooleanClass) -> BooleanType,
+    ClassType(Definitions.BoxedCharacterClass) -> CharType,
+    ClassType(Definitions.BoxedByteClass) -> ByteType,
+    ClassType(Definitions.BoxedShortClass) -> ShortType,
+    ClassType(Definitions.BoxedIntegerClass) -> IntType,
+    ClassType(Definitions.BoxedFloatClass) -> FloatType,
+    ClassType(Definitions.BoxedLongClass) -> LongType,
+    ClassType(Definitions.BoxedDoubleClass) -> DoubleType
   )
 
   private val classKinds = Map(
@@ -383,13 +438,15 @@ object Utils {
 
   private[utils] def toInternal(t: Type): String = t match {
     case NoType => "V"
-    case AnyType => "O"
+    case AnyType => Definitions.ObjectClass
     case BooleanType => "Z"
     case IntType => "I"
     case LongType => "J"
     case FloatType => "F"
     case DoubleType => "D"
     case StringType => "T"
+    case ByteType => "B"
+    case ShortType => "S"
     case ArrayType(ArrayTypeRef(elem, dims)) => "A"*dims + encodeName(elem)
     // FIXME: Remove this after kotlin-stdlib is compiled correctly
     case ClassType(name) if name.matches("kotlin.Function*") => name.replace("kotlin.Function", "sjs_js_Function")

@@ -1,5 +1,6 @@
 package ch.epfl.k2sjsir.translate
 
+import ch.epfl.k2sjsir.utils.Utils
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -23,11 +24,20 @@ case class GenUnary(d: KtUnaryExpression)(implicit val c: TranslationContext) ex
           case _: KtPrefixExpression =>
             Block(Assign(lhs, binOp), lhs)
           case _: KtPostfixExpression =>
-            val v = VarDef(Ident("tmp$1"), lhs.tpe, mutable = false, lhs)
+            val v = VarDef(Ident(Utils.getFreshName("tmp$")), lhs.tpe, mutable = false, lhs)
             Block(v, Assign(lhs, binOp), v.ref)
-          case _ => notImplemented()
+          case _ => notImplemented("near ++ or --")
         }
-      case _ => notImplemented()
+
+      case KtTokens.EXCLEXCL =>
+        If(
+          Utils.genNotNullCond(lhs),
+          lhs,
+          Throw(New(ClassType("jl_NullPointerException"), Ident("init___"), Nil))
+        )(lhs.tpe)
+
+      case operation =>
+        notImplemented(s"default case for operation $operation")
     }
   }
 
@@ -53,6 +63,8 @@ object GenUnary {
   }
 
   private def getLiteral(v: Int, tpe: Type)(implicit pos: Position): Tree = tpe match {
+    case ByteType => ByteLiteral(v.toByte)
+    case ShortType => ShortLiteral(v.toShort)
     case IntType => IntLiteral(v.toInt)
     case LongType => LongLiteral(v.toLong)
     case DoubleType => DoubleLiteral(v.toDouble)

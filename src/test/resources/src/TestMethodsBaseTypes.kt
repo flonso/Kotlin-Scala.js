@@ -40,7 +40,7 @@ fun run() {
     // Conversion from Byte to ...
     println("=== Type cast : from Byte to X ===")
 
-    val myByte : Byte = 1
+    val myByte : Byte = 0b1
     val myByteAsInt = myByte.toInt()
     val myByteAsShort = myByte.toShort()
     val myByteAsLong = myByte.toLong()

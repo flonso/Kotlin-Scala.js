@@ -1,5 +1,14 @@
 
 class BlackBoxSimpleTests extends BlackBoxTest {
+  test("Test Companions") {
+    val result = "" /*
+      """
+        |Hello from an object within an object
+        |Hello from an object
+      """.stripMargin*/
+    assertExecResult(result, Seq("companion"), mainClass = "CompanionTestKt")
+  }
+
   test("TestClasses.kt") {
     val result =
       """
@@ -346,15 +355,30 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       """.stripMargin, Seq("TestIf.kt"), mainClass = "TestIfKt")
   }
 
-  //  test("TestNullable.kt") {
-  //    assertExecResult(
-  //      """7
-  //        |7
-  //        |null
-  //        |7
-  //        |-1
-  //        |NonNullnull""".stripMargin, "TestNullable.kt")
-  //  }
+  test("TestNullable.kt") {
+    assertExecResult(
+      """
+        |1
+        |null
+        |null
+        |1
+        |7
+        |null
+        |0
+        |7
+        |null
+        |4
+        |Dummy function
+        |Dummy function
+        |7
+        |-1
+        |NonNullnull
+        |Caught NPE
+        |Caught NPE
+        |Null pointer caught successfully
+        |Dummy function
+      """.stripMargin, Seq("TestNullable.kt"), mainClass = "TestNullableKt")
+  }
 
 
   test("TestTryCatch.kt") {

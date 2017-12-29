@@ -5,10 +5,12 @@ import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.operation.AssignmentTranslator
 import org.jetbrains.kotlin.js.translate.operation.CompareToTranslator.isCompareToCall
+import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils.getCallableDescriptorForOperationExpression
 import org.jetbrains.kotlin.js.translate.utils.PsiUtils.getOperationToken
 import org.jetbrains.kotlin.lexer.{KtSingleValueToken, KtToken, KtTokens}
 import org.jetbrains.kotlin.psi.KtBinaryExpression
+import org.jetbrains.kotlin.types.{KotlinType, TypeUtils}
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
@@ -20,14 +22,15 @@ import scala.annotation.switch
 case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) extends Gen[KtBinaryExpression] {
   import GenBinary._
 
-  override def tree: Tree = {
-    val desc = getCallableDescriptorForOperationExpression(c.bindingContext(), d)
-    val op = getOperationToken(d)
-    val lhs = GenExpr(d.getLeft).tree
-    val rhs = GenExpr(d.getRight).tree
-    val tpe = if (desc != null) desc.getReturnType.toJsType else lhs.tpe
+  val desc = getCallableDescriptorForOperationExpression(c.bindingContext(), d)
+  val op = getOperationToken(d)
+  val lhs = GenExpr(d.getLeft).tree
+  val rhs = GenExpr(d.getRight).tree
+  val tpe = if (desc != null) desc.getReturnType.toJsType else lhs.tpe
 
-    if (op == KtTokens.ELVIS) translateElvis(lhs, rhs)
+  override def tree: Tree = {
+
+    if (op == KtTokens.ELVIS) translateElvis(d)
     else if(op == KtTokens.ANDAND) If(lhs, rhs, BooleanLiteral(false))(BooleanType)
     else if(op == KtTokens.OROR) If(lhs, BooleanLiteral(true), rhs)(BooleanType)
     else if (AssignmentTranslator.isAssignmentOperator(op)) GenAssign(d).tree
@@ -147,73 +150,22 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
         }
       }
     }
-    /* else if (isStructCompare(op)) {
-      val binOp =
-        if (isLongType(lhs.tpe) && isLongType(rhs.tpe)) Some(longBinaryOp(op.toString))
-        else if (isNumericType(lhs.tpe) && isNumericType(rhs.tpe)) Some(numBinaryOp(op.toString))
-        else None
-
-      if(binOp.nonEmpty)
-        BinaryOp(binOp.get, lhs, rhs)
-      else {
-        // See structural equality definition in Kotlin docs
-
-        val lhsName = Ident("x$1")
-        val rhsName = Ident("x$2")
-
-        val lhsDef = VarDef(lhsName, lhs.tpe, false, lhs)
-        val rhsDef = VarDef(rhsName, rhs.tpe, false, rhs)
-
-        val lhsRef = VarRef(lhsName)(lhs.tpe)
-        val rhsRef = VarRef(rhsName)(rhs.tpe)
-
-        val equalsIdent = Ident("equals__O__Z", Some("equals"))
-
-        val finalIf = If(
-          BinaryOp(
-            BinaryOp.===,
-            lhsRef,
-            Null()
-          ),
-          BinaryOp(
-            BinaryOp.===,
-            rhsRef,
-            Null()
-          ),
-          Apply(lhsRef, equalsIdent, List(rhsRef))(BooleanType)
-        )(BooleanType)
-
-        val block = Block(List(
-          lhsDef,
-          rhsDef,
-          finalIf
-        ))
-
-        if (op == KtTokens.EXCLEQ)
-          UnaryOp(UnaryOp.Boolean_!, block)
-        else
-          block
-      }
-    } else {
-      val binOp = op match {
-        case KtTokens.IDENTIFIER => getBinaryOp(desc.toJsName, tpe)
-        case k: KtSingleValueToken => getBinaryOp(k.toString, tpe)
-        case _ => notImplemented(); -1
-      }
-      val (clhs, crhs) = if(isLongOp(binOp, lhs.tpe, rhs.tpe)) {
-        (intToLong(lhs), if (isLongSpecial(binOp)) longToInt(rhs) else intToLong(rhs))
-      } else {
-        val lsrc = convertArg(binOp, lhs, lhs.tpe, tpe)
-        val rsrc = convertArg(binOp, rhs, rhs.tpe, tpe)
-        (lsrc, rsrc)
-      }
-      BinaryOp(binOp, clhs, crhs)
-    }
-    */
   }
 
-  private def translateElvis(left: Tree, right: Tree): Tree = {
-    notImplemented()
+  private def translateElvis(expr: KtBinaryExpression): Tree = {
+    val left = expr.getLeft
+    val right = expr.getRight
+
+    val exprTpe = BindingUtils.getTypeForExpression(c.bindingContext(), expr)
+
+    val lhs = GenExpr(left).tree
+    val rhs = GenExpr(right).tree
+
+    val cond = genNotNullCond(lhs)
+
+    // lhs is always nullable (because of elvis), therefore we need to cast it
+    // it's safe to do so because it will only be cast if it's non null
+    If(cond, cast(lhs, exprTpe), rhs)(exprTpe.toJsType)
   }
 
   private def isNotOverloadable(op: KtToken): Boolean =

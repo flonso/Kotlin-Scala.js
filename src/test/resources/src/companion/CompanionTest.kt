@@ -15,11 +15,10 @@ class MyObjectClass {
 
 fun main(args: Array<String>) {
     //fun myfun(): MyObjectClass.MyObject = MyObjectClass.MyObject
-
     //myfun().inner
 
-    println(MyObjectClass.MyObject.MyOtherObject.inner)
-    println(MyObjectClass.MyObject.inner)
+    //println(MyObjectClass.MyObject.MyOtherObject.inner)
+    //println(MyObjectClass.MyObject.inner)
 
 
 }

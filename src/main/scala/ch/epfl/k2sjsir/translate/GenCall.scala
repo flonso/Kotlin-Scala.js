@@ -1,16 +1,18 @@
 package ch.epfl.k2sjsir.translate
 
-import ch.epfl.k2sjsir.utils.NameEncoder
+import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
 import ch.epfl.k2sjsir.utils.NameEncoder._
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDescriptor, ClassDescriptor, SimpleFunctionDescriptor}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
+import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver, ReceiverValue}
+import org.jetbrains.kotlin.types.TypeUtils
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types._
 
@@ -26,14 +28,16 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
 
   override def tree: Tree = withReceiver(None)
 
-  def withReceiver(rcv: Option[KtExpression] = None): Tree = {
+  def withReceiver(rcv: Option[KtExpression] = None, isSafe: Boolean = false): Tree = {
     desc match {
       case cc: ClassConstructorDescriptor =>
-        val ctpe =
-          if(cc.getContainingDeclaration.getName.toString == "Exception")
-            ClassType("jl_Exception")
-          else
-            cc.getContainingDeclaration.toJsClassType
+        val ctpe = {
+          val ccName = cc.getContainingDeclaration.getName.toString
+          ccName match {
+            case "Exception" => ClassType("jl_Exception")
+            case _ => cc.getContainingDeclaration.toJsClassType
+          }
+        }
 
         if(!cc.getContainingDeclaration.isExternal)
           New(ctpe, desc.toJsMethodIdent, args)
@@ -58,6 +62,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
         else {
           if (rcv.nonEmpty) {
             val receiver = GenExpr(rcv.get).tree
+
             val isLambdaCall = name == "invoke"
             val isDirectInvokeCall = d.getText.matches("^invoke[(].*[)]$")
             val isArray = receiver.tpe.isInstanceOf[ArrayType]
@@ -70,7 +75,9 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
               arrayOps(receiver, rtpe, name, args).getOrElse(notImplemented("Missing array operation"))
             }
             else if (isUnaryOp(name)) {
-              adaptPrimitive(receiver, rtpe)
+              val exprTpe = BindingUtils.getTypeForExpression(c.bindingContext(), rcv.get)
+              val castRcv = cast(receiver, TypeUtils.makeNotNullable(exprTpe))
+              adaptPrimitive(castRcv, rtpe)
             }
             else {
               // FIXME: do not match on the receiver but on its tpe
