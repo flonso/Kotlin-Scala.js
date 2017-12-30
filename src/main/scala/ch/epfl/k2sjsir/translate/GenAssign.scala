@@ -41,7 +41,7 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
                 case cl: ThisClassReceiver => genThisFromContext(cl.getType.toJsType, p)
                 case cl: ClassValueReceiver => GenExpr(cl.getExpression).tree
                 case e: ExpressionReceiver => GenExpr(e.getExpression).tree
-                case _ if p.isRootPackage => null // Receiver is not used later in this case
+                case _ if p.isTopLevel => null // Receiver is not used later in this case
                 case _ => notImplemented("Unhandled receiver type (from PropertyDescriptor)")
               }
 
@@ -54,7 +54,7 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
                   val binOp = GenBinary.getBinaryOp(code, tpe)
                   val args = BinaryOp(binOp, Apply(receiver, p.getGetter.toJsMethodIdent, List())(tpe), right)
 
-                  if (p.isRootPackage) {
+                  if (p.isTopLevel) {
                     val clsTpe = d.getContainingKtFile.toJsClassType
                     ApplyStatic(clsTpe, methodIdent, List(args))(callRtpe)
 
@@ -63,7 +63,7 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
                     Apply(receiver, methodIdent, List(args))(callRtpe)
 
                 case KtTokens.EQ =>
-                  if (p.isRootPackage) {
+                  if (p.isTopLevel) {
                     val clsTpe = d.getContainingKtFile.toJsClassType
                     ApplyStatic(clsTpe, methodIdent, List(right))(callRtpe)
 

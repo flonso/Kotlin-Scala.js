@@ -14,9 +14,13 @@ object GenExprUtils {
   def genDotQualified(k: KtQualifiedExpression, notImplemented: String => Tree)(implicit c: TranslationContext, pos: Position): Tree = {
     val isSafe = k.isInstanceOf[KtSafeQualifiedExpression]
 
-    // (MyObjectClass.MyObject.MyOtherObject).inner
-    val receiver = k.getReceiverExpression
     // If it's an object/module gen a module load and drop the rest (see GenJsCode)
+    val receiver = k.getReceiverExpression match {
+      case qe: KtQualifiedExpression =>
+        qe.getSelectorExpression
+      case x => x
+    }
+
     val receiverExpr = GenExpr(receiver).tree
 
     val selector = k.getSelectorExpression
@@ -60,7 +64,7 @@ object GenExprUtils {
 
                 Apply(receiverExpr, Ident(cls.getName().asString() + "__" + parent.toJsClassType.className), Nil)(tpe)
               } else {
-                Select(receiverExpr, Ident(selectorDesc.getName.asString()))(tpe)
+                GenExpr(selector).tree
               }
 
             case desc => notImplemented(s"after KtDotQualifiedExpression > KtNameReferenceExpression with descriptor $desc")

@@ -79,25 +79,28 @@ object NameEncoder {
       else ""
     }
 
-    val className = getFqName(d).asString()
+    val className = d.getNameEvenIfAnon
     encodeClassName(className, suffix)
   }
 
   private[utils] def encodeMethodIdent(
       d: CallableDescriptor,
-      reflProxy: Boolean = false)(implicit pos: Position): Ident =
-    Ident(encodeMethodName(d, reflProxy), Some(d.getName.asString()))
+      reflProxy: Boolean = false,
+      kotlinNaming: Boolean = false)(implicit pos: Position): Ident =
+    Ident(encodeMethodName(d, reflProxy, kotlinNaming = kotlinNaming), Some(d.getName.asString()))
 
   private[utils] def encodeMethodName(
       d: CallableDescriptor,
-      reflProxy: Boolean = false)(implicit pos: Position): String =
-    encodeMethodNameInternal(d, reflProxy, false).mkString
+      reflProxy: Boolean = false,
+      kotlinNaming: Boolean = false)(implicit pos: Position): String =
+    encodeMethodNameInternal(d, reflProxy, inRTClass = false, kotlinNaming = kotlinNaming).mkString
 
   private def encodeMethodNameInternal(
       d: CallableDescriptor,
       reflProxy: Boolean = false,
-      inRTClass: Boolean = false)(implicit pos: Position): Seq[String] = {
-    val stringName = d.getName.asString()
+      inRTClass: Boolean = false,
+      kotlinNaming: Boolean = false)(implicit pos: Position): Seq[String] = {
+    val stringName = d.getNameEvenIfAnon
     val name = encodeMemberNameInternal(stringName)
     def privateSuffix(cl: Option[ClassDescriptor]) = cl.fold("") { c =>
       if (c.getKind == INTERFACE && !c.isActual) encodeClassFullName(c)
@@ -112,6 +115,8 @@ object NameEncoder {
       case _: LazyPackageDescriptor | _: LazyJavaPackageFragment |
           _: BuiltInsPackageFragment =>
         Option(getContainingClass(d))
+      case sf: SimpleFunctionDescriptor =>
+        Option(DescriptorUtils.getContainingClass(sf))
       case x => throw new Error(s"${getClass.toString}: Not supported yet: $x")
     }
     val isPrivate = d.getVisibility == Visibilities.PRIVATE
@@ -120,20 +125,21 @@ object NameEncoder {
       else if (isPrivate)
         encodeName(name) + OuterSep + "p" + privateSuffix(owner)
       else encodeName(name)
-    val paramsString = makeParamsString(d, reflProxy, inRTClass)
+    val paramsString = makeParamsString(d, reflProxy, inRTClass, kotlinNaming = kotlinNaming)
     Seq(encodedName, paramsString)
   }
 
   private def makeParamsString(
       d: CallableDescriptor,
       reflProxy: Boolean,
-      inRTClass: Boolean)(implicit pos: Position): String = {
+      inRTClass: Boolean,
+      kotlinNaming: Boolean = false)(implicit pos: Position): String = {
     val owner = d.getContainingDeclaration match {
       case c: ClassDescriptor => Some(c)
       case _ => None
     }
 
-    val paramsIntf = owner.fold("")(c => if (c.getKind == INTERFACE) c.toJsClassName else "")
+    val paramsIntf = owner.fold("")(c => if (kotlinNaming && c.isInterface) c.toJsClassName else "")
     val params0 = d.getValueParameters.asScala.map(_.toJsInternal)
     val x = d.getExtensionReceiverParameter
     val params1 =
@@ -158,10 +164,6 @@ object NameEncoder {
 
   def encodeWithSourceFile(d: DeclarationDescriptor): String = {
     val srcFile: SourceFile = DescriptorUtils.getContainingSourceFile(d)
-
-    if (srcFile == SourceFile.NO_SOURCE_FILE) {
-      return NameEncoder.encodeClassName("kotlin.Stdlib", "") // FIXME: This needs to be the local "scope" of the class
-    }
 
     val psiSrcFile: PsiSourceFile = srcFile.asInstanceOf[PsiSourceFile]
 

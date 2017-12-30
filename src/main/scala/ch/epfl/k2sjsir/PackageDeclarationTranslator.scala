@@ -52,7 +52,7 @@ final class PackageDeclarationTranslator private(
             case d: KtClassOrObject if !predefinedObject=>
               val cd = getClassDescriptor(context.bindingContext(), d)
               if (cd.getKind == KtClassKind.ANNOTATION_CLASS)
-                return // Skip annotations... we don't care about them !
+                return // Skip annotations... we don't care about them for now !
 
               val genClass = GenClass(d)(context)
 

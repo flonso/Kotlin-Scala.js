@@ -17,7 +17,7 @@ case class GenFun(d: KtNamedFunction)(implicit val c: TranslationContext) extend
 
   override def tree: MethodDef = {
     val body = GenBody(d.getBodyExpression).treeOption
-    val idt = desc.toJsMethodIdent
+    val idt = desc.toJsMethodDeclIdent
     val extensionParam = Option(desc.getExtensionReceiverParameter).map(_.toJsParamDef)
     // FIXME: Dirty hack to pass instance of interface to the default implementation
     // See org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.kt line 56
@@ -36,7 +36,7 @@ case class GenFun(d: KtNamedFunction)(implicit val c: TranslationContext) extend
   def withAbstractBody: MethodDef = {
     val desc = getFunctionDescriptor(c.bindingContext(), d)
     val body = None
-    val idt = desc.toJsMethodIdent
+    val idt = desc.toJsMethodDeclIdent
     val extensionReceiver = Option(desc.getExtensionReceiverParameter).map(_.toJsParamDef)
     val args = extensionReceiver ++ desc.getValueParameters.asScala.map(_.toJsParamDef)
     val opt = OptimizerHints.empty.withInline(desc.isInline)

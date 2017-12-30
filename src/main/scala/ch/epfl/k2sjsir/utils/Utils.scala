@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.psi.{KtFile, KtProperty}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyPackageDescriptor
 import org.scalajs.core.ir
 
 import scala.collection.JavaConverters._
@@ -34,6 +35,8 @@ object Utils {
   implicit class CallableDescriptorTranslator(d: CallableDescriptor) {
     def toJsMethodIdent(implicit pos: Position): Ident = encodeMethodIdent(d)
 
+    def toJsMethodDeclIdent(implicit pos: Position): Ident = encodeMethodIdent(d, kotlinNaming = true)
+
     def toJsBridgeIdent(implicit  pos: Position): Ident = {
       val clsName = d match {
         case fd: FunctionDescriptor => Option(fd.getContainingDeclaration.asInstanceOf[ClassDescriptor].toJsClassName)
@@ -46,8 +49,12 @@ object Utils {
       Ident(tmpIdt.name.replaceFirst(toReplace, ""), tmpIdt.originalName)
     }
 
-    def isRootPackage: Boolean = d.getContainingDeclaration.toJsName == "root"
+    def isTopLevel: Boolean = d.getContainingDeclaration match {
+      case _: LazyPackageDescriptor => true
+      case _ => false
+    }
 
+    def getNameEvenIfAnon: String = d.getName.toString.replace("<no name provided>", "anonymous")
   }
 
   implicit class ClassDescriptorTranslator(d: ClassDescriptor) {
@@ -71,13 +78,17 @@ object Utils {
 
     def toJsClassKind: ClassKind = getClassKind(d.getKind)
 
-    def isInterface: Boolean = d.toJsClassKind == ClassKind.Interface
+    def isInterface: Boolean = DescriptorUtils.isInterface(d)
 
-    def isEnumClass: Boolean = d.getKind == KtClassKind.ENUM_CLASS
+    def isEnumClass: Boolean = DescriptorUtils.isEnumClass(d)
 
-    def isEnumEntry: Boolean = d.getKind == KtClassKind.ENUM_ENTRY
+    def isEnumEntry: Boolean = DescriptorUtils.isEnumEntry(d)
 
     def isJLEnum: Boolean = d.toJsClassType == ClassType("jl_Enum")
+
+    def isAnonymous: Boolean = DescriptorUtils.getFqName(d).toString.contains("<no name provided>")
+
+    def getNameEvenIfAnon: String = DescriptorUtils.getFqName(d).toString.replace("<no name provided>", "NoNameProvided")
   }
 
   implicit class ParameterTranslator(d: ParameterDescriptor) {
@@ -356,7 +367,12 @@ object Utils {
   }
 
   private def getClassType(tpe: KotlinType): ClassType = {
-    ClassType(encodeClassName(getName(tpe), ""))
+    val suffix = TypeUtils.getClassDescriptor(tpe) match {
+      case cd: ClassDescriptor if isCompanionObject(cd) || isObject(cd) => "$"
+      case _ => ""
+    }
+
+    ClassType(encodeClassName(getName(tpe), suffix))
   }
 
   private def getClassKind(kind: KtClassKind): ClassKind = {
@@ -447,10 +463,11 @@ object Utils {
     case StringType => "T"
     case ByteType => "B"
     case ShortType => "S"
+    case CharType => "C"
     case ArrayType(ArrayTypeRef(elem, dims)) => "A"*dims + encodeName(elem)
     // FIXME: Remove this after kotlin-stdlib is compiled correctly
     case ClassType(name) if name.matches("kotlin.Function*") => name.replace("kotlin.Function", "sjs_js_Function")
-    case ClassType(name) => name
+    case ClassType(name) => name.replace("<no name provided>", "NoNameProvided")
     case NothingType => Definitions.RuntimeNothingClass
     case NullType => Definitions.RuntimeNullClass
     case _ => throw new Error(s"Unknown Scala.js type: $t")

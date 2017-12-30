@@ -1,12 +1,15 @@
 package ch.epfl.k2sjsir.translate
 
+import ch.epfl.k2sjsir.SJSIRCodegen
 import ch.epfl.k2sjsir.utils.{GenExprUtils, NameEncoder}
 import ch.epfl.k2sjsir.utils.Utils._
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyClassDescriptor
@@ -50,7 +53,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             }
             val isObj = recv != null && (recv.isCompanionObject || DescriptorUtils.isObject(recv))
 
-            if(m.isRootPackage) {
+            if(m.isTopLevel) {
               val name = JvmFileClassUtil.getFileClassInfoNoResolve(d.getContainingKtFile).getFileClassFqName.asString()
               val encodedName = NameEncoder.encodeClassName(name, "")
 
@@ -113,8 +116,36 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             notImplemented(s"after KtNameReferenceExpression (default case) $t")
         }
       case k: KtConstantExpression => GenConst(k).tree
+      case k: KtObjectLiteralExpression =>
+        /*
+         * Note that anonymous objects can be used as types only in local and private declarations.
+         * If you use an anonymous object as a return type of a public function or the type of a
+         * public property, the actual type of that function or property will be the declared
+         * supertype of the anonymous object, or Any if you didn't declare any supertype.
+         * Members added in the anonymous object will not be accessible.
+         */
+        val output = c.getConfig.getConfiguration.get(CommonConfigurationKeys.MODULE_NAME)
+        val objDeclaration = k.getObjectDeclaration
+        val objDescriptor = BindingUtils.getClassDescriptor(c.bindingContext(), objDeclaration)
+        val classDef = GenClass(objDeclaration).tree
+        // TODO: Move this IR file creation in the PackageDeclarationTranslator file
+        SJSIRCodegen.genIRFile(output, objDescriptor, classDef)
+
+        New(objDescriptor.toJsClassType, Ident("init___"), Nil)
       case k: KtArrayAccessExpression => GenArrayAccess(k).tree
       case k: KtBinaryExpression => GenBinary(k).tree
+      case k: KtBinaryExpressionWithTypeRHS =>
+        val opRef = k.getOperationReference
+        val left = GenExpr(k.getLeft).tree
+        val ktType = c.bindingTrace().get(BindingContext.TYPE, k.getRight)
+
+        opRef.getReferencedNameElementType match {
+          case KtTokens.AS_KEYWORD =>
+            cast(left, ktType)
+
+          case _ =>
+            notImplemented(s"Unsupported '${opRef.getReferencedName}' to $ktType")
+        }
       case k: KtForExpression => GenFor(k).tree
       case k: KtSafeQualifiedExpression =>
         // receiver?.selector => if (receiver != null) receiver.selector else null

@@ -102,7 +102,7 @@ object GenProperty {
     val tpe = dispatchReceiver.fold(null: KotlinType)(dr => dr.getType)
     val cd = dispatchReceiver.fold(null: ClassDescriptor)(_ => DescriptorUtils.getClassDescriptorForType(tpe))
 
-    val methodIdent = propGetterDesc.toJsMethodIdent
+    val methodIdent = propGetterDesc.toJsMethodDeclIdent
     val static = cd != null && isInterface(cd)
 
     val body = {
@@ -146,7 +146,7 @@ object GenProperty {
     val rtpe = NoType // Kotlin setters always return Unit
     val isStatic = false
     val propTpe = desc.getType.toJsType
-    val methodIdent = propGetterDesc.toJsMethodIdent
+    val methodIdent = propGetterDesc.toJsMethodDeclIdent
     val setterIdent = Ident(s"value")
     val params = List(ParamDef(setterIdent, desc.getType.toJsType, mutable = false, rest = false))
 
@@ -192,7 +192,7 @@ object GenProperty {
     val ident = desc.toJsIdent
     val slctTpe = desc.getType.toJsType
 
-    val clsTpe = if (!desc.isRootPackage) {
+    val clsTpe = if (!desc.isTopLevel) {
       val tpe = desc.getDispatchReceiverParameter.getType
       DescriptorUtils.getClassDescriptorForType(tpe).toJsClassType
 

@@ -1,12 +1,26 @@
 
 class BlackBoxSimpleTests extends BlackBoxTest {
-  test("Test Companions") {
-    val result = "" /*
+  /*
+  test("Benchmarks - DeltaBlue") {
+    assertExecResult("", Seq("benchmarks/deltablue", "benchmarks/Benchmark.kt"))
+  }
+  */
+
+  test("TestObjects.kt") {
+    val result =
       """
+        |someobject inner value
+        |nothing to be done, inside anonymous object
+        |printing something
+        |publicFoo.AnonymousObjects$NoNameProvided@1 foo.x publicFooWithClass.x publicFooWithInterface.x
+        |Hello from an object
+        |Hello from a companion object
+        |some new inner value
         |Hello from an object within an object
         |Hello from an object
-      """.stripMargin*/
-    assertExecResult(result, Seq("companion"), mainClass = "CompanionTestKt")
+        |Hello from an object within an object
+      """.stripMargin
+    assertExecResult(result, Seq("objects"), mainClass = "TestObjectsKt")
   }
 
   test("TestClasses.kt") {
@@ -465,13 +479,13 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       """.stripMargin, Seq("TestLambda.kt"), mainClass = "TestLambdaKt")
   }
 
-  //  test("TestTypeCast.kt") {
-  //    assertExecResult(
-  //      """
-  //        |15
-  //        |12.5
-  //      """.stripMargin, "TestTypeCast.kt")
-  //  }
+  test("TestTypeCast.kt") {
+    assertExecResult(
+      """
+        |15
+        |MyCastClass(0)
+      """.stripMargin, Seq("TestTypeCast.kt"), mainClass = "TestTypeCastKt")
+  }
 
   test("TestArraysBase.kt") {
     val result = consoleToString {

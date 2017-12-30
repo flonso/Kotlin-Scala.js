@@ -5,9 +5,9 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.psi.{KtCallExpression, KtStringTemplateExpression, KtTypeReference}
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
-import org.scalajs.core.ir.Trees
+import org.scalajs.core.ir.{Definitions, Trees}
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{ClassType, DoubleType, FloatType, IntType}
+import org.scalajs.core.ir.Types._
 
 import scala.collection.JavaConverters._
 
@@ -37,44 +37,62 @@ case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
     val argAsString = tmp.slice(1, tmp.length - 1)
 
     argAsString match {
+      // TODO: Verify this
+      case "array[i] = value;" =>
+        val arrayTpe = ArrayType(ArrayTypeRef("C", 1))
+        ArraySelect(VarRef(Ident("array"))(arrayTpe), VarRef(Ident("i"))(IntType))(AnyType)
+
+      // TODO: Verify this
+      case "new Uint16Array(size)" =>
+        val arrayTpe = ArrayType(ArrayTypeRef("LUint16Array", 1))
+        NewArray(arrayTpe, List(VarRef(Ident("size"))(IntType)))
+
       case "Kotlin.identityHashCode" =>
         Apply(LoadModule(ClassType("jl_System$")),
               Ident("identityHashCode__O__I"),
               List())(IntType)
+
       case "Number.MIN_VALUE" =>
         findClosestTypeRef(d) match {
           case Some("Double") => DoubleLiteral(Double.MinPositiveValue)
           case Some("Float") => FloatLiteral(Float.MinPositiveValue)
           case _ => notImplemented("Number.MIN_VALUE should only be used for Float or Double")
         }
+
       case "Number.MAX_VALUE" =>
         findClosestTypeRef(d) match {
           case Some("Double") => DoubleLiteral(Double.MaxValue)
           case Some("Float") => FloatLiteral(Float.MaxValue)
           case _ => notImplemented("Number.MAX_VALUE should only be used for Float or Double")
         }
+
       case "Number.POSITIVE_INFINITY" =>
         findClosestTypeRef(d) match {
           case Some("Double") => DoubleLiteral(Double.PositiveInfinity)
           case Some("Float") => FloatLiteral(Float.PositiveInfinity)
           case _ => notImplemented("Number.POSITIVE_INFINITY should only be used for Float or Double")
         }
+
       case "Number.NEGATIVE_INFINITY" =>
         findClosestTypeRef(d) match {
           case Some("Double") => DoubleLiteral(Double.NegativeInfinity)
           case Some("Float") => FloatLiteral(Float.NegativeInfinity)
           case _ => notImplemented("Number.NEGATIVE_INFINITY should only be used for Float or Double")
         }
+
       case "Number.NaN" =>
         findClosestTypeRef(d) match {
           case Some("Double") => DoubleLiteral(Double.NaN)
           case Some("Float") => FloatLiteral(Float.NaN)
           case _ => notImplemented("Number.NaN should only be used for Float or Double")
         }
+
       case "Kotlin.Long.MIN_VALUE" =>
         LongLiteral(Long.MinValue)
+
       case "Kotlin.Long.MAX_VALUE" =>
         LongLiteral(Long.MaxValue)
+
       case _ => notImplemented(s"using argument $argAsString")
     }
   }
@@ -84,16 +102,16 @@ case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
       if (psi == null)
         None
 
-      if (psi.isInstanceOf[KtTypeReference])
-        Some(psi.asInstanceOf[KtTypeReference])
-      else
-        _findClosestTypeRef(psi.getPrevSibling)
+      psi match {
+        case tpRef: KtTypeReference => Some(tpRef)
+        case _ => _findClosestTypeRef(psi.getPrevSibling)
+      }
     }
 
     val psi = _findClosestTypeRef(pe)
 
     if (psi.nonEmpty)
-      Some(psi.get.getText())
+      Some(psi.get.getText)
     else
       None
   }

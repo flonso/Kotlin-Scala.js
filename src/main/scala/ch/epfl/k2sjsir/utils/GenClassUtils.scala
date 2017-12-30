@@ -140,7 +140,7 @@ object GenClassUtils {
               val newName = Ident(name.encodedName.replaceFirst("__" + clsDesc.toJsClassName, ""))
 
               val newBody = {
-                val methodIdent = funDesc.toJsMethodIdent
+                val methodIdent = funDesc.toJsMethodDeclIdent
                 val defaultImplCls = clsDesc.toJsDefaultImplType
                 val cls = clsDesc.toJsClassType
                 val self = genThisFromContext(cls)

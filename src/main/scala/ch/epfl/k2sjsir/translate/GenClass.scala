@@ -1,6 +1,5 @@
 package ch.epfl.k2sjsir.translate
 
-import ch.epfl.k2sjsir.utils.GenClassUtils
 import ch.epfl.k2sjsir.utils.GenClassUtils._
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
@@ -14,7 +13,7 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt._
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{ClassType, IntType, NoType, StringType}
-import org.scalajs.core.ir.{ClassKind, Trees}
+import org.scalajs.core.ir.{ClassKind, Definitions, Trees}
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.List
@@ -46,8 +45,10 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       - naming convention : <interface_name>$DefaultImpls
 
     For classes implementing interfaces :
+    (Kotlin generates fake descriptors in order to generate bridges)
     - Generate all overridden methods and variables as usual
     - Generate missing methods (from interfaces) by calling the default implementation of the interfaces
+      see org.jetbrains.kotlin.backend.common.bridges
 
 
     For Enum classes :
@@ -145,11 +146,12 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
   def treeDefaultImpls: Option[ClassDef] = {
     val impls = d.getDefaultImplementations
 
+
     if (impls.isEmpty) return None
 
     val kind = ClassKind.Class
     val name = desc.toJsDefaultImplIdent
-    val superClass = Some(Ident("O"))
+    val superClass = Some(Ident(Definitions.ObjectClass))
 
     val defs: List[MemberDef] = impls.collect {
       case p: KtProperty =>
