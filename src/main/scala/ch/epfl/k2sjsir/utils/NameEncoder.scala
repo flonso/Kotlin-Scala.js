@@ -2,16 +2,18 @@ package ch.epfl.k2sjsir.utils
 
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.builtins.BuiltInsPackageFragment
+import org.jetbrains.kotlin.com.intellij.psi.PsiFile
 import org.jetbrains.kotlin.descriptors.ClassKind.INTERFACE
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.load.java.`lazy`.descriptors.LazyJavaPackageFragment
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils}
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyPackageDescriptor
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt.getAllSuperclassesWithoutAny
 import org.jetbrains.kotlin.resolve.source.PsiSourceFile
+import org.jetbrains.kotlin.serialization.js.KotlinJavascriptPackageFragment
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.{Definitions, Position}
 
@@ -113,11 +115,12 @@ object NameEncoder {
       case c: ClassDescriptor     => Some(c)
       case t: TypeAliasDescriptor => Some(t.getClassDescriptor)
       case _: LazyPackageDescriptor | _: LazyJavaPackageFragment |
-          _: BuiltInsPackageFragment =>
+          _: BuiltInsPackageFragment | _: KotlinJavascriptPackageFragment =>
         Option(getContainingClass(d))
       case sf: SimpleFunctionDescriptor =>
         Option(DescriptorUtils.getContainingClass(sf))
-      case x => throw new Error(s"${getClass.toString}: Not supported yet: $x")
+      case x =>
+        throw new Error(s"${getClass.toString}: Not supported yet: $x")
     }
     val isPrivate = d.getVisibility == Visibilities.PRIVATE
     val encodedName =
@@ -139,6 +142,7 @@ object NameEncoder {
       case _ => None
     }
 
+    // TODO: replace kotlinaming with a call to DescriptorUtils.isAnonymousObject
     val paramsIntf = owner.fold("")(c => if (kotlinNaming && c.isInterface) c.toJsClassName else "")
     val params0 = d.getValueParameters.asScala.map(_.toJsInternal)
     val x = d.getExtensionReceiverParameter
@@ -163,12 +167,10 @@ object NameEncoder {
   }
 
   def encodeWithSourceFile(d: DeclarationDescriptor): String = {
-    val srcFile: SourceFile = DescriptorUtils.getContainingSourceFile(d)
-
-    val psiSrcFile: PsiSourceFile = srcFile.asInstanceOf[PsiSourceFile]
+    val file: KtFile = DescriptorToSourceUtils.getContainingFile(d)
 
     val name = JvmFileClassUtil
-      .getFileClassInfoNoResolve(psiSrcFile.getPsiFile.asInstanceOf[KtFile])
+      .getFileClassInfoNoResolve(file)
       .getFileClassFqName
 
     NameEncoder.encodeClassName(name.asString(), "")

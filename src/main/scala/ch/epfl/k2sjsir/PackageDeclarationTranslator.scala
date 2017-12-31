@@ -41,6 +41,8 @@ final class PackageDeclarationTranslator private(
 
     for (file <- files) {
       try {
+        println(s"Compiling file ${file}")
+
         val topLevelFunctions = new mutable.MutableList[KtNamedFunction]()
         val topLevelValues = new mutable.MutableList[KtProperty]()
         val declarations = new SJSIRLower().lower(file)
@@ -51,20 +53,20 @@ final class PackageDeclarationTranslator private(
           declaration match {
             case d: KtClassOrObject if !predefinedObject=>
               val cd = getClassDescriptor(context.bindingContext(), d)
-              if (cd.getKind == KtClassKind.ANNOTATION_CLASS)
-                return // Skip annotations... we don't care about them for now !
+              if (cd.getKind == KtClassKind.ANNOTATION_CLASS) {
+                println(s"SKIPPED ANNOTATION CLASS ${cd.toJsName}")
+              } else {
+                val genClass = GenClass(d)(context)
 
-              val genClass = GenClass(d)(context)
-
-              val tree = genClass.tree
-              val treeDefaultImpls: Option[ClassDef] = genClass.treeDefaultImpls
-              val treeEnumCompanion: Option[ClassDef] = genClass.treeEnumCompanion
+                val tree = genClass.tree
+                val treeDefaultImpls: Option[ClassDef] = genClass.treeDefaultImpls
+                val treeEnumCompanion: Option[ClassDef] = genClass.treeEnumCompanion
 
 
-              SJSIRCodegen.genIRFile(output, cd, tree)
-              treeDefaultImpls.foreach(SJSIRCodegen.genIRDefaultImpls(output, cd, _))
-              treeEnumCompanion.foreach(SJSIRCodegen.genIREnumCompanion(output, cd, _))
-
+                SJSIRCodegen.genIRFile(output, cd, tree)
+                treeDefaultImpls.foreach(SJSIRCodegen.genIRDefaultImpls(output, cd, _))
+                treeEnumCompanion.foreach(SJSIRCodegen.genIREnumCompanion(output, cd, _))
+              }
             case d: KtClassOrObject =>
               val tree = GenExternalClass(d)(context).tree
               val cd = getClassDescriptor(context.bindingContext(), d)

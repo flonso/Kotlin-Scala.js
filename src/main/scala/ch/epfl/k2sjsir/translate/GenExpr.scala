@@ -63,8 +63,10 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             }
             else if(isObj)
               Apply(LoadModule(recv.toJsClassType), m.getterIdent(), List())(tpe)
-            else if(DescriptorUtils.isLocal(m))
-              VarRef(m.toJsIdent)(recv.toJsClassType)
+            else if(DescriptorUtils.isLocal(m)) {
+              println("IS LOCAL")
+              VarRef(m.toJsIdent)(m.getReturnType.toJsType)
+            }
             else {
               val a = CallUtilKt.getResolvedCallWithAssert(d, c.bindingContext())
               a.getDispatchReceiver match {
@@ -153,7 +155,8 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case k: KtDotQualifiedExpression =>
         GenExprUtils.genDotQualified(k, notImplemented)
 
-      case k: KtUnaryExpression => GenUnary(k).tree
+      case k: KtUnaryExpression =>
+        GenUnary(k).tree
       case k: KtTryExpression =>
         val content = GenBody(k.getTryBlock).tree
         val catches = k.getCatchClauses.asScala.map(ctch => ({
