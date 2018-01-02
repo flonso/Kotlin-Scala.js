@@ -29,18 +29,20 @@ class MyClassWithAccessors {
         }
 }
 
-fun main(args: Array<String>) {
-    val a = MyClassWithAccessors()
+object TestAccessorsGen {
+    fun main(args: Array<String>) {
+        val a = MyClassWithAccessors()
 
-    println(a.id)
-    println(a.name)
-    println(a.myVar)
-    a.myVar = 4
-    println(a.myVar)
-    a.myVar = 0
-    println(a.myVar)
-    println(a.tmp)
-    a.tmp = "tmp2"
-    println(a.tmp)
+        println(a.id)
+        println(a.name)
+        println(a.myVar)
+        a.myVar = 4
+        println(a.myVar)
+        a.myVar = 0
+        println(a.myVar)
+        println(a.tmp)
+        a.tmp = "tmp2"
+        println(a.tmp)
 
+    }
 }

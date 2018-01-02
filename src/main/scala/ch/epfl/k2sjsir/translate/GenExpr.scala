@@ -8,14 +8,14 @@ import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
-import org.jetbrains.kotlin.js.translate.utils.BindingUtils
+import org.jetbrains.kotlin.js.translate.utils.{BindingUtils, TranslationUtils}
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyClassDescriptor
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver}
-import org.jetbrains.kotlin.resolve.{BindingContext, DescriptorUtils}
+import org.jetbrains.kotlin.resolve.{BindingContext, BindingContextUtils, DescriptorUtils, PropertyImportedFromObject}
 import org.scalajs.core.ir.Trees
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{AnyType, ClassType}
@@ -46,6 +46,14 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         VarDef(desc.toJsIdent, desc.getType.toJsType, kp.isVar, expr)
       case kn: KtNameReferenceExpression =>
         BindingUtils.getDescriptorForReferenceExpression(c.bindingContext(), kn) match {
+          case m: PropertyImportedFromObject =>
+            val propDesc = m.getCallableFromObject
+            val dispatchReceiver = propDesc.getDispatchReceiverParameter
+
+            val recv = getClassDescriptorForType(dispatchReceiver.getValue.getType)
+
+            Apply(LoadModule(recv.toJsClassType), m.getterIdent(), Nil)(m.getType.toJsType)
+
           case m: PropertyDescriptor =>
             val tpe = m.getType.toJsType
             val dispatchReceiver = m.getDispatchReceiverParameter
@@ -55,6 +63,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
               else
                 null
             }
+
             val isObj = recv != null && (recv.isCompanionObject || DescriptorUtils.isObject(recv))
 
             if(m.isTopLevel) {
@@ -197,6 +206,11 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         val cond = GenExpr(w.getCondition).tree
         While(cond, body)
 
+      case dw: KtDoWhileExpression =>
+        val body = GenBody(dw.getBody).tree
+        val cond = GenExpr(dw.getCondition).tree
+        DoWhile(cond, body)
+
       case k: KtIsExpression => GenIs(k).tree
       case k: KtThisExpression =>
         val tpe = c.bindingContext().getType(k)
@@ -213,6 +227,48 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
         genThisFromContext(tpe.toJsType, desc)
 
+      case k: KtDestructuringDeclaration =>
+        for {
+          entry: KtDestructuringDeclarationEntry <- k.getEntries.asScala.toList;
+          varDesc: VariableDescriptor = BindingContextUtils.getNotNull(c.bindingContext(), BindingContext.VARIABLE, entry)
+          if !varDesc.getName.isSpecial
+        } yield {
+          val entryInitCall = c.bindingContext().get(BindingContext.COMPONENT_RESOLVED_CALL, entry)
+
+          assert(entryInitCall != null, "Entry init call must not be null")
+
+
+          //TranslationUtils.coerce(c, ???, varDesc.getType)
+        }
+
+        notImplemented(s"Destructuring")
+        /*
+        for (KtDestructuringDeclarationEntry entry : multiDeclaration.getEntries()) {
+          VariableDescriptor descriptor = BindingContextUtils.getNotNull(context().bindingContext(), BindingContext.VARIABLE, entry);
+            // Do not call `componentX` for destructuring entry called _
+          if (descriptor.getName().isSpecial()) continue;
+
+          ResolvedCall<FunctionDescriptor> entryInitCall = context().bindingContext().get(BindingContext.COMPONENT_RESOLVED_CALL, entry);
+          assert entryInitCall != null : "Entry init call must be not null";
+          JsExpression entryInitializer = CallTranslator.translate(context(), entryInitCall, multiObjectExpr);
+          FunctionDescriptor candidateDescriptor = entryInitCall.getCandidateDescriptor();
+          if (CallExpressionTranslator.shouldBeInlined(candidateDescriptor, context())) {
+          setInlineCallMetadata(entryInitializer, entry, entryInitCall, context());
+          }
+
+          entryInitializer = TranslationUtils.coerce(context(), entryInitializer, descriptor.getType());
+
+          JsName name = context().getNameForDescriptor(descriptor);
+          if (isVarCapturedInClosure(context().bindingContext(), descriptor)) {
+          JsNameRef alias = getCapturedVarAccessor(name.makeRef());
+          entryInitializer = JsAstUtils.wrapValue(alias, entryInitializer);
+          }
+
+          JsVars.JsVar jsVar = new JsVars.JsVar(name, entryInitializer);
+          jsVar.setSource(entry);
+          jsVars.add(jsVar);
+      }
+      */
       case b: KtBlockExpression =>
         GenBody(b).tree
 

@@ -187,7 +187,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
   }
 
   private def isUnaryOp(n: String): Boolean =
-    n == "toByte" || n == "toShort" || n == "toLong" || n == "toInt" || n == "toDouble" || n == "toFloat" || n == "not" || isUnaryToBinary(n)
+    n == "toChar" || n == "toByte" || n == "toShort" || n == "toLong" || n == "toInt" || n == "toDouble" || n == "toFloat" || n == "not" || isUnaryToBinary(n)
 
   private def isUnaryToBinary(n: String) = n == "unaryMinus"
 

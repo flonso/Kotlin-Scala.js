@@ -12,18 +12,20 @@ class Derived(p: Int) : Base(p) {
     }
 }
 
-fun main(args: Array<String>) {
-    val myDouble = 1.7
-    val myInt = 4
-    val myLong = 23432542300000
-    val myDerived = Derived(myInt)
-    val myBase = Base(myInt)
+object TestIsOperator {
+    fun main(args: Array<String>) {
+        val myDouble = 1.7
+        val myInt = 4
+        val myLong = 23432542300000
+        val myDerived = Derived(myInt)
+        val myBase = Base(myInt)
 
-    check(myDouble)
-    check(myInt)
-    check(myLong)
-    check(myDerived)
-    check(myBase)
+        check(myDouble)
+        check(myInt)
+        check(myLong)
+        check(myDerived)
+        check(myBase)
+    }
 }
 
 fun check(a: Any) {

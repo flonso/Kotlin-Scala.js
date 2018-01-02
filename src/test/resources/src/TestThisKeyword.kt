@@ -9,11 +9,13 @@ class MyClass(val num: Int) {
     }
 }
 
-fun main(args: Array<String>) {
-    val a = MyClass(1)
-    val b = MyClass(1)
-    val c = MyClass(2)
+object TestThisKeyword {
+    fun main(args: Array<String>) {
+        val a = MyClass(1)
+        val b = MyClass(1)
+        val c = MyClass(2)
 
-    println(a.equals(b))
-    println(a.equals(c))
+        println(a.equals(b))
+        println(a.equals(c))
+    }
 }

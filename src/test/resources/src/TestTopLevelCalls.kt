@@ -11,17 +11,19 @@ class TopLevelCaller {
     }
 }
 
-fun main(args: Array<String>) {
-    val c = TopLevelCaller()
-    c.call()
+object TestTopLevelCalls {
+    fun main(args: Array<String>) {
+        val c = TopLevelCaller()
+        c.call()
 
-    hello()
-    welcome("Kotlin")
-    /*
+        hello()
+        welcome("Kotlin")
+        /*
     // FIXME: Cannot call the top-level properties yet
     println(myVal)
     println(myVar)
     myVar = "My top-level variable"
     println(myVar)
     */
+    }
 }

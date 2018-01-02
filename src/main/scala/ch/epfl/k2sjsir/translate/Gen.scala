@@ -1,5 +1,7 @@
 package ch.epfl.k2sjsir.translate
 
+import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.psi.KtElement
@@ -23,10 +25,12 @@ trait IRNodeGen[T <: KtElement, TreeType <: IRNode] {
   def tree: TreeType
 
   private def notImplementedPrint(debugStr: String = "") = {
-    val c = getClass.getSimpleName
+    val simpleName = getClass.getSimpleName
     val name = if (d != null) d.getClass.getSimpleName else ""
-    println(s"Not supported $c: $name" + (if (!debugStr.isEmpty) s" with message $debugStr" else ""))
-    println(s"at pos : $pos")
+    val msg = s"Not supported $simpleName: $name" + (if (!debugStr.isEmpty) s" with message $debugStr" else "") + s"at pos : $pos"
+
+    val messageCollector = c.getConfig.getConfiguration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+    messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, msg, null)
   }
 
   def notImplemented(debugStr: String = ""): Tree = {

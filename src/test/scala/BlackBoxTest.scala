@@ -2,6 +2,7 @@ import java.io.{ByteArrayOutputStream, File, PrintStream}
 
 import ch.epfl.k2sjsir.K2SJSIRCompiler
 import org.jetbrains.kotlin.cli.common.ExitCode
+import org.scalajs.cli.Scalajsld
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import scala.sys.process._
@@ -72,7 +73,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     if (exitCode != ExitCode.OK)
       fail(s"Compilation process finished with status $exitCode")
 
-    Scalajsld.run(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
+    Scalajsld.main(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
   }
 
   protected def assertExecResult(expected: String, sources: Seq[String], outFile: String = "out.js", mainClass: String = "Test") = {
@@ -87,32 +88,33 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     if (exitCode != ExitCode.OK)
       fail(s"Compilation process finished with status $exitCode")
 
-    Scalajsld.run(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
+    val linkerArgs = Array(
+      ROOT_OUT, // Where to find the sjsir files
+      "--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR",
+      ROOT_LIB_OUT,
+      "-o", s"$ROOT_OUT/$outFile",
+      "-c",
+      "-mm", mainClass)
 
-    val success = (s"echo $mainClass.main()" #>> new File(s"$ROOT_OUT/$outFile")).!
+    Scalajsld.main(linkerArgs)
 
-    if(success == 0) {
-      val result = s"node $ROOT_OUT/$outFile".!!
+    val result = s"node $ROOT_OUT/$outFile".!!
 
-      val expectedRes = expected.replaceAll("\\s+", "")
-      val outputRes = result.replaceAll("\\s+", "")
-      if(expectedRes != outputRes) {
-        val explodeExpected = expected.split("\n")
-        val explodeOutput = result.split("\n")
-        val sb = new StringBuffer()
+    val expectedRes = expected.replaceAll("\\s+", "")
+    val outputRes = result.replaceAll("\\s+", "")
 
-        sb.append("\nOutput is different: (whitespace is always ignored)\n")
-        sb.append("\nOutput\n" )
-        sb.append("=========================\n")
-        sb.append(result)
-        sb.append("\nExpected output\n" )
-        sb.append("=========================\n")
-        sb.append(expected)
+    if(expectedRes != outputRes) {
+      val sb = new StringBuffer()
 
-        fail(sb.toString)
-      }
-    } else {
-      fail("Unable to append line to file")
+      sb.append("\nOutput is different: (whitespace is always ignored)\n")
+      sb.append("\nOutput\n" )
+      sb.append("=========================\n")
+      sb.append(result)
+      sb.append("\nExpected output\n" )
+      sb.append("=========================\n")
+      sb.append(expected)
+
+      fail(sb.toString)
     }
   }
 

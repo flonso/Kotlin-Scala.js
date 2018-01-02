@@ -37,6 +37,9 @@ object MyHighOrderTest {
     }
 }
 
-fun main(args: Array<String>) {
-    MyHighOrderTest.main()
+object TestHighOrderFunction {
+
+    fun main(args: Array<String>) {
+        MyHighOrderTest.main()
+    }
 }

@@ -46,17 +46,19 @@ class TestClass {
     }
 }
 
-fun main(args: Array<String>) {
-    val myLocalLambda: () -> Unit = {
-        println("I'm in the body of a local lambda expression")
-    }
+object TestLambda {
+    fun main(args: Array<String>) {
+        val myLocalLambda: () -> Unit = {
+            println("I'm in the body of a local lambda expression")
+        }
 
-    myLocalLambda()
-    val ml = TestClass()
-    ml.myFun()
-    ml.funWithEqualSign(2)("Hello World")
-    ml.myLambdaWithNoParamAndNoType()
-    ml.myLambdaWithParamAndNoType("I'm a lambda with no return type and string param")
-    ml.myLambdaWithNoParamAndSring()
-    ml.myLambdaWithParamsAndString(1, "plus 0.42 is", 1.42)
+        myLocalLambda()
+        val ml = TestClass()
+        ml.myFun()
+        ml.funWithEqualSign(2)("Hello World")
+        ml.myLambdaWithNoParamAndNoType()
+        ml.myLambdaWithParamAndNoType("I'm a lambda with no return type and string param")
+        ml.myLambdaWithNoParamAndSring()
+        ml.myLambdaWithParamsAndString(1, "plus 0.42 is", 1.42)
+    }
 }

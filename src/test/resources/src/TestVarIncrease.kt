@@ -29,6 +29,8 @@ object MyTestObj {
     }
 }
 
-fun main(args: Array<String>) {
-    MyTestObj.main()
+object TestVarIncrease {
+    fun main(args: Array<String>) {
+        MyTestObj.main()
+    }
 }

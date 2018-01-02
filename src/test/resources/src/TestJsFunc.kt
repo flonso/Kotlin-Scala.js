@@ -1,11 +1,9 @@
-package kotlin.js
-external fun js(code: String): dynamic
+object TestJsFunc {
+    fun main(args: Array<String>) {
+        val c = MyClassForJsFunc()
 
-fun main(args: Array<String>) {
-
-    val c = MyClassForJsFunc()
-
-    c.dummy()
+        c.dummy()
+    }
 }
 
 class MyClassForJsFunc {

@@ -20,6 +20,8 @@ object Test {
     }
 }
 
-fun main(args: Array<String>) {
-    Test.main()
+object TestTopClassExtension {
+    fun main(args: Array<String>) {
+        Test.main()
+    }
 }

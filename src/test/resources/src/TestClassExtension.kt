@@ -53,6 +53,8 @@ object Test {
 
 }
 
-fun main(args: Array<String>) {
-    Test.main()
+object TestClassExtension {
+    fun main(args: Array<String>) {
+        Test.main()
+    }
 }

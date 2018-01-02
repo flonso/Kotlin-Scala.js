@@ -115,7 +115,7 @@ object NameEncoder {
       case c: ClassDescriptor     => Some(c)
       case t: TypeAliasDescriptor => Some(t.getClassDescriptor)
       case _: LazyPackageDescriptor | _: LazyJavaPackageFragment |
-          _: BuiltInsPackageFragment | _: KotlinJavascriptPackageFragment =>
+          _: BuiltInsPackageFragment /*| _: KotlinJavascriptPackageFragment*/ =>
         Option(getContainingClass(d))
       case sf: SimpleFunctionDescriptor =>
         Option(DescriptorUtils.getContainingClass(sf))

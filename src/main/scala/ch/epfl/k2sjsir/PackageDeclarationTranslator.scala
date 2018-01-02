@@ -7,6 +7,8 @@ import ch.epfl.k2sjsir.translate._
 import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.backend.jvm.lower.InterfaceLowering
+import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
@@ -38,10 +40,11 @@ final class PackageDeclarationTranslator private(
                                                 ) extends AbstractTranslator(context) {
   private def translate(): Unit = {
     val output = context.getConfig.getConfiguration.get(CommonConfigurationKeys.MODULE_NAME)
+    val messageCollector = context.getConfig.getConfiguration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
 
     for (file <- files) {
       try {
-        println(s"Compiling file ${file}")
+        messageCollector.report(CompilerMessageSeverity.INFO,s"Compiling file ${file}", null)
 
         val topLevelFunctions = new mutable.MutableList[KtNamedFunction]()
         val topLevelValues = new mutable.MutableList[KtProperty]()
@@ -54,7 +57,7 @@ final class PackageDeclarationTranslator private(
             case d: KtClassOrObject if !predefinedObject=>
               val cd = getClassDescriptor(context.bindingContext(), d)
               if (cd.getKind == KtClassKind.ANNOTATION_CLASS) {
-                println(s"SKIPPED ANNOTATION CLASS ${cd.toJsName}")
+                messageCollector.report(CompilerMessageSeverity.WARNING, s"SKIPPED ANNOTATION CLASS ${cd.toJsName}", null)
               } else {
                 val genClass = GenClass(d)(context)
 
@@ -123,8 +126,9 @@ final class PackageDeclarationTranslator private(
               List(),
               None,
               None,
-              ctorAndDefs ++ (if (hasMain) manualExports() else Nil),
-              List(TopLevelModuleExportDef(className)(pos)))(OptimizerHints.empty)(pos)
+              ctorAndDefs/* ++ (if (hasMain) manualExports() else Nil)*/,
+              Nil
+              /*List(TopLevelModuleExportDef(className)(pos))*/)(OptimizerHints.empty)(pos)
 
           val name = encodedName.drop(1).replace("_", "/")
           SJSIRCodegen.genIRFile(output, name, cls)

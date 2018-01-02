@@ -1,7 +1,9 @@
 package loops
 
-fun main(args: Array<String>) {
-    val forLoopTester = ForLoopTester()
+object TestLoops {
+    fun main(args: Array<String>) {
+        val forLoopTester = ForLoopTester()
 
-    forLoopTester.testAll()
+        forLoopTester.testAll()
+    }
 }

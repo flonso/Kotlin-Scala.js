@@ -1,8 +1,9 @@
-fun main(args: Array<String>) {
-    run()
+object TestMethodsBaseTypes {
+    fun main(args: Array<String>) {
+        run()
+    }
 }
 
-// TODO: Implement char type cast in 1.0.0-M2
 fun run() {
 
     // From Kotlin docs
@@ -22,13 +23,13 @@ fun run() {
     // Conversion from Int to ...
     println("=== Type cast : from Int to X ===")
 
-    val myInt : Int = 1
+    val myInt : Int = 65
     val myIntAsByte = myInt.toByte()
     val myIntAsShort = myInt.toShort()
     val myIntAsLong = myInt.toLong()
     val myIntAsFloat = myInt.toFloat()
     val myIntAsDouble = myInt.toDouble()
-    //val char = one.toChar()
+    val myIntAsChar = myInt.toChar()
 
     println("Int $myInt")
     println("Byte $myIntAsByte")
@@ -36,17 +37,18 @@ fun run() {
     println("Long $myIntAsLong")
     println("Float $myIntAsFloat")
     println("Double $myIntAsDouble")
+    println("Char $myIntAsChar")
 
     // Conversion from Byte to ...
     println("=== Type cast : from Byte to X ===")
 
-    val myByte : Byte = 0b1
+    val myByte : Byte = 0b0100_0001
     val myByteAsInt = myByte.toInt()
     val myByteAsShort = myByte.toShort()
     val myByteAsLong = myByte.toLong()
     val myByteAsFloat = myByte.toFloat()
     val myByteAsDouble = myByte.toDouble()
-    //val char = one.toChar()
+    val myByteAsChar = myByte.toChar()
 
     println("Byte $myByte")
     println("Int $myByteAsInt")
@@ -54,17 +56,18 @@ fun run() {
     println("Long $myByteAsLong")
     println("Float $myByteAsFloat")
     println("Double $myByteAsDouble")
+    println("Char $myByteAsChar")
 
     // Conversion from Short to ...
     println("=== Type cast : from Short to X ===")
 
-    val myShort : Short = 1
+    val myShort : Short = 65
     val myShortAsInt = myShort.toInt()
     val myShortAsByte = myShort.toByte()
     val myShortAsLong = myShort.toLong()
     val myShortAsFloat = myShort.toFloat()
     val myShortAsDouble = myShort.toDouble()
-    //val char = one.toChar()
+    val myShortAsChar = myShort.toChar()
 
     println("Short $myShort")
     println("Int $myShortAsInt")
@@ -72,17 +75,18 @@ fun run() {
     println("Long $myShortAsLong")
     println("Float $myShortAsFloat")
     println("Double $myShortAsDouble")
+    println("Char $myShortAsChar")
 
     // Conversion from Long to ...
     println("=== Type cast : from Long to X ===")
 
-    val myLong : Long = 1
+    val myLong : Long = 65
     val myLongAsInt = myLong.toInt()
     val myLongAsByte = myLong.toByte()
     val myLongAsShort = myLong.toShort()
     val myLongAsFloat = myLong.toFloat()
     val myLongAsDouble = myLong.toDouble()
-    //val char = one.toChar()
+    val myLongAsChar = myLong.toChar()
 
     println("Long $myLong")
     println("Int $myLongAsInt")
@@ -90,17 +94,18 @@ fun run() {
     println("Short $myLongAsShort")
     println("Float $myLongAsFloat")
     println("Double $myLongAsDouble")
+    println("Char $myLongAsChar")
 
     // Conversion from Float to ...
     println("=== Type cast : from Float to X ===")
 
-    val myFloat : Float = 1.0f
+    val myFloat : Float = 65.4f
     val myFloatAsInt = myFloat.toInt()
     val myFloatAsByte = myFloat.toByte()
     val myFloatAsShort = myFloat.toShort()
     val myFloatAsLong = myFloat.toLong()
     val myFloatAsDouble = myFloat.toDouble()
-    //val char = one.toChar()
+    val myFloatAsChar = myFloat.toChar()
 
     println("Float $myFloat")
     println("Int $myFloatAsInt")
@@ -108,17 +113,18 @@ fun run() {
     println("Short $myFloatAsShort")
     println("Long $myFloatAsLong")
     println("Double $myFloatAsDouble")
+    println("Char $myFloatAsChar")
 
     // Conversion from Double to ...
     println("=== Type cast : from Double to X ===")
 
-    val myDouble : Double = 1.0
+    val myDouble : Double = 65.7
     val myDoubleAsInt = myDouble.toInt()
     val myDoubleAsByte = myDouble.toByte()
     val myDoubleAsShort = myDouble.toShort()
     val myDoubleAsFloat = myDouble.toFloat()
     val myDoubleAsLong = myDouble.toLong()
-    //val char = one.toChar()
+    val myDoubleAsChar = myDouble.toChar()
 
     println("Double $myDouble")
     println("Int $myDoubleAsInt")
@@ -126,6 +132,24 @@ fun run() {
     println("Short $myDoubleAsShort")
     println("Float $myDoubleAsFloat")
     println("Long $myDoubleAsLong")
+    println("Char $myDoubleAsChar")
 
+    // Conversion from Char to ...
+    println("=== Type cast : from Char to X ===")
 
+    val myChar : Char = 'A'
+    val myCharAsInt = myChar.toInt()
+    val myCharAsByte = myChar.toByte()
+    val myCharAsShort = myChar.toShort()
+    val myCharAsFloat = myChar.toFloat()
+    val myCharAsLong = myChar.toLong()
+    val myCharAsDouble = myChar.toDouble()
+
+    println("Char $myChar")
+    println("Int $myCharAsInt")
+    println("Byte $myCharAsByte")
+    println("Short $myCharAsShort")
+    println("Float $myCharAsFloat")
+    println("Long $myCharAsLong")
+    println("Double $myCharAsDouble")
 }

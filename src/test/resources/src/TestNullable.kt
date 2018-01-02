@@ -21,66 +21,68 @@ fun npeAssertWithCatch(a: Any?) {
     }
 }
 
-fun main(args: Array<String>) {
-    val e: Int? = if (true) 1 else null
-    val f: DummyClass? = if (false) DummyClass() else null
-    val g: Int? = null
-    val h: Int? = if (false) null else 1
+object TestNullable {
+    fun main(args: Array<String>) {
+        val e: Int? = if (true) 1 else null
+        val f: DummyClass? = if (false) DummyClass() else null
+        val g: Int? = null
+        val h: Int? = if (false) null else 1
 
-    println(e)
-    println(f)
-    println(g)
-    println(h)
+        println(e)
+        println(f)
+        println(g)
+        println(h)
 
-    val myDouble: Double? = 4.2
-    val b : String? = "NonNull"
-    val d : String? = null
-    val myNull: DummyClass? = null
-    val myNonNull: DummyClass = DummyClass()
+        val myDouble: Double? = 4.2
+        val b: String? = "NonNull"
+        val d: String? = null
+        val myNull: DummyClass? = null
+        val myNonNull: DummyClass = DummyClass()
 
-    // Auto cast
-    if(b != null) println(b.length)
-    if(d != null) println(d.length)
-    if (myDouble != null) myDouble.toInt() else null
+        // Auto cast
+        if (b != null) println(b.length)
+        if (d != null) println(d.length)
+        if (myDouble != null) myDouble.toInt() else null
 
-    // Safe call operator
-    val c: Int? = b?.length
-    val nullVal = myNonNull.getNullable(true)?.a1
-    val zeroVal = myNonNull.getNullable(false)?.a1
+        // Safe call operator
+        val c: Int? = b?.length
+        val nullVal = myNonNull.getNullable(true)?.a1
+        val zeroVal = myNonNull.getNullable(false)?.a1
 
-    println(nullVal)
-    println(zeroVal)
+        println(nullVal)
+        println(zeroVal)
 
-    println(c)
-    println(d?.length)
+        println(c)
+        println(d?.length)
 
-    println(myDouble?.toInt())
+        println(myDouble?.toInt())
 
-    // Elvis operator
-    val l = b?.length ?: -1
-    val q = d?.length ?: -1
-    val r = myNull ?: DummyClass()
-    val s = myNonNull.getNullable(true) ?: myNonNull.getSelf()
+        // Elvis operator
+        val l = b?.length ?: -1
+        val q = d?.length ?: -1
+        val r = myNull ?: DummyClass()
+        val s = myNonNull.getNullable(true) ?: myNonNull.getSelf()
 
-    r.dummyFun()
-    s.dummyFun()
+        r.dummyFun()
+        s.dummyFun()
 
-    println(l)
-    println(q)
-    println(b + d)
+        println(l)
+        println(q)
+        println(b + d)
 
-    // !! Operator
-    npeAssertWithCatch(myNull)
-    npeAssertWithCatch(d)
-    npeAssertWithCatch(myNonNull)
+        // !! Operator
+        npeAssertWithCatch(myNull)
+        npeAssertWithCatch(d)
+        npeAssertWithCatch(myNonNull)
 
-    try {
-        myNull!!.dummyFun()
-    } catch(e: NullPointerException) {
-        println("Null pointer caught successfully")
+        try {
+            myNull!!.dummyFun()
+        } catch (e: NullPointerException) {
+            println("Null pointer caught successfully")
+        }
+
+        myNonNull!!.dummyFun()
+
+
     }
-
-    myNonNull!!.dummyFun()
-
-
 }

@@ -44,9 +44,16 @@ fun myClassWithSuperTest() {
     c.test()
 }
 
-fun main(args: Array<String>) {
-    myEnumTests()
-    myInheritanceTest()
-    myClassWithSuperTest()
+fun myDataClassTest() {
+    val r = Result(0, 1.0, "mystring")
+    r.test()
+}
 
+object TestClasses {
+    fun main(args: Array<String>) {
+        myEnumTests()
+        myInheritanceTest()
+        myClassWithSuperTest()
+        //myDataClassTest()
+    }
 }
