@@ -82,9 +82,6 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
         }
       }
 
-      if (lhs.tpe == AnyType || rhs.tpe == AnyType)
-        println(opName)
-
       val lsrc =
         if (opType == AnyType || opType == StringType) lhs
         else adaptPrimitive(lhs, opType)

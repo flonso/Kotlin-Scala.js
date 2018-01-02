@@ -1,10 +1,19 @@
 
 class BlackBoxSimpleTests extends BlackBoxTest {
-  /*
-  test("Benchmarks - DeltaBlue") {
-    assertExecResult("", Seq("benchmarks/deltablue", "benchmarks/Benchmark.kt"))
+
+  test("TestLoops.kt") {
+    val result =
+      """
+        |55
+        |30
+        |45
+        |20
+        |55
+        |4
+      """.stripMargin
+
+    assertExecResult(result, Seq("loops"), mainClass = "loops.TestLoopsKt")
   }
-  */
 
   test("TestObjects.kt") {
     val result =
