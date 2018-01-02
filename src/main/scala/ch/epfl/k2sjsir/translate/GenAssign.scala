@@ -32,79 +32,80 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
       notImplemented("when generating backing field from constructor")
     }
     else {
-      AccessTranslationUtils.getAccessTranslator(left, c) match {
-        case v: VariableAccessTranslator =>
-          val call = CallUtilKt.getResolvedCallWithAssert(left, c.bindingContext())
-          call.getResultingDescriptor match {
-            case p: PropertyDescriptor =>
-              val receiver = call.getDispatchReceiver match {
-                case cl: ThisClassReceiver => genThisFromContext(cl.getType.toJsType, p)
-                case cl: ClassValueReceiver => GenExpr(cl.getExpression).tree
-                case e: ExpressionReceiver => GenExpr(e.getExpression).tree
-                case _ if p.isTopLevel => null // Receiver is not used later in this case
-                case _ => notImplemented("Unhandled receiver type (from PropertyDescriptor)")
-              }
+      val resolvedCall = CallUtilKt.getResolvedCallWithAssert(left, c.bindingContext())
 
-              val methodIdent = p.getSetter.toJsMethodIdent
-              val callRtpe = NoType
+      resolvedCall.getResultingDescriptor match {
+        case s: SyntheticFieldDescriptor =>
+          val backingField = {
+            val property = s.getPropertyDescriptor
+            val thisTpe = DescriptorUtils.getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
+            val name = property.getName.asString()
+            val rcv = genThisFromContext(thisTpe)
 
-              val ret = d.getOperationToken match {
-                case KtTokens.PLUSEQ | KtTokens.MINUSEQ | KtTokens.MULTEQ | KtTokens.DIVEQ | KtTokens.PERCEQ =>
-                  val code = d.getOperationToken.toString.replaceAll("[T]?EQ", "")
-                  val binOp = GenBinary.getBinaryOp(code, tpe)
-                  val args = BinaryOp(binOp, Apply(receiver, p.getGetter.toJsMethodIdent, List())(tpe), right)
-
-                  if (p.isTopLevel) {
-                    val clsTpe = d.getContainingKtFile.toJsClassType
-                    ApplyStatic(clsTpe, methodIdent, List(args))(callRtpe)
-
-                  }
-                  else
-                    Apply(receiver, methodIdent, List(args))(callRtpe)
-
-                case KtTokens.EQ =>
-                  if (p.isTopLevel) {
-                    val clsTpe = d.getContainingKtFile.toJsClassType
-                    ApplyStatic(clsTpe, methodIdent, List(right))(callRtpe)
-
-                  }
-                  else
-                    Apply(receiver, methodIdent, List(right))(callRtpe)
-              }
-
-              ret
-            case l: LocalVariableDescriptor =>
-              val ref = VarRef(l.toJsIdent)(l.getType.toJsType)
-              d.getOperationToken match {
-                case KtTokens.PLUSEQ | KtTokens.MINUSEQ | KtTokens.MULTEQ | KtTokens.DIVEQ | KtTokens.PERCEQ =>
-                  val code = d.getOperationToken.toString.replaceAll("[T]?EQ", "")
-                  val binOp = GenBinary.getBinaryOp(code, tpe)
-                  Assign(VarRef(l.toJsIdent)(l.getType.toJsType), BinaryOp(binOp, ref, right))
-
-                case KtTokens.EQ =>
-                  Assign(VarRef(l.toJsIdent)(l.getType.toJsType), right)
-              }
-          }
-        case a: ArrayAccessTranslator =>
-          if(d.getOperationToken == KtTokens.EQ) Assign(GenExpr(left).tree, right)
-          else ArraySelect(GenExpr(left).tree, right)(tpe)
-
-        case b: BackingFieldAccessTranslator =>
-          val call = CallUtilKt.getResolvedCallWithAssert(left, c.bindingContext())
-
-          val backingField = call.getResultingDescriptor match {
-            case s: SyntheticFieldDescriptor =>
-              val property = s.getPropertyDescriptor
-              val thisTpe = DescriptorUtils.getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
-              val name = property.getName.asString()
-              val rcv = genThisFromContext(thisTpe)
-
-              Select(rcv, Ident(name))(tpe)
+            Select(rcv, Ident(name))(tpe)
           }
 
           Assign(backingField, right)
-        case t => notImplemented(s"After acces translator (${t.toString})")
+
+        case p: PropertyDescriptor =>
+          val receiver = resolvedCall.getDispatchReceiver match {
+            case cl: ThisClassReceiver => genThisFromContext(cl.getType.toJsType, p)
+            case cl: ClassValueReceiver => GenExpr(cl.getExpression).tree
+            case e: ExpressionReceiver => GenExpr(e.getExpression).tree
+            case _ if p.isTopLevel => null // Receiver is not used later in this case
+            case _ => notImplemented("Unhandled receiver type (from PropertyDescriptor)")
+          }
+
+          val methodIdent = p.getSetter.toJsMethodIdent
+          val callRtpe = NoType
+
+          val ret = d.getOperationToken match {
+            case KtTokens.PLUSEQ | KtTokens.MINUSEQ | KtTokens.MULTEQ | KtTokens.DIVEQ | KtTokens.PERCEQ =>
+              val code = d.getOperationToken.toString.replaceAll("[T]?EQ", "")
+              val binOp = GenBinary.getBinaryOp(code, tpe)
+              val args = BinaryOp(binOp, Apply(receiver, p.getGetter.toJsMethodIdent, List())(tpe), right)
+
+              if (p.isTopLevel) {
+                val clsTpe = d.getContainingKtFile.toJsClassType
+                ApplyStatic(clsTpe, methodIdent, List(args))(callRtpe)
+
+              }
+              else
+                Apply(receiver, methodIdent, List(args))(callRtpe)
+
+            case KtTokens.EQ =>
+              if (p.isTopLevel) {
+                val clsTpe = d.getContainingKtFile.toJsClassType
+                ApplyStatic(clsTpe, methodIdent, List(right))(callRtpe)
+
+              }
+              else
+                Apply(receiver, methodIdent, List(right))(callRtpe)
+          }
+
+          ret
+        case l: LocalVariableDescriptor =>
+          val ref = VarRef(l.toJsIdent)(l.getType.toJsType)
+          d.getOperationToken match {
+            case KtTokens.PLUSEQ | KtTokens.MINUSEQ | KtTokens.MULTEQ | KtTokens.DIVEQ | KtTokens.PERCEQ =>
+              val code = d.getOperationToken.toString.replaceAll("[T]?EQ", "")
+              val binOp = GenBinary.getBinaryOp(code, tpe)
+              Assign(VarRef(l.toJsIdent)(l.getType.toJsType), BinaryOp(binOp, ref, right))
+
+            case KtTokens.EQ =>
+              Assign(VarRef(l.toJsIdent)(l.getType.toJsType), right)
+          }
+
+        case _ =>
+          AccessTranslationUtils.getAccessTranslator(left, c) match {
+            case a: ArrayAccessTranslator =>
+              if(d.getOperationToken == KtTokens.EQ) Assign(GenExpr(left).tree, right)
+              else ArraySelect(GenExpr(left).tree, right)(tpe)
+
+            case t => notImplemented(s"After acces translator (${t.toString})")
+          }
       }
+
     }
   }
 
