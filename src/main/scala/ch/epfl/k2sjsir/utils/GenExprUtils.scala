@@ -3,7 +3,7 @@ package ch.epfl.k2sjsir.utils
 import ch.epfl.k2sjsir.translate.{GenCall, GenExpr}
 import org.jetbrains.kotlin.descriptors.{ClassDescriptor, PropertyDescriptor}
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
-import org.jetbrains.kotlin.psi.{KtCallExpression, KtNameReferenceExpression, KtQualifiedExpression, KtSafeQualifiedExpression}
+import org.jetbrains.kotlin.psi._
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{ArrayType, ClassRef, Type}
 import ch.epfl.k2sjsir.utils.Utils._
@@ -14,7 +14,7 @@ object GenExprUtils {
   def genDotQualified(k: KtQualifiedExpression, notImplemented: String => Tree)(implicit c: TranslationContext, pos: Position): Tree = {
     val isSafe = k.isInstanceOf[KtSafeQualifiedExpression]
 
-    // If it's an object/module gen a module load and drop the rest (see GenJsCode)
+    // If it's an object/module gen a module load and drop the rest
     val receiver = k.getReceiverExpression match {
       case qe: KtQualifiedExpression =>
         qe.getSelectorExpression

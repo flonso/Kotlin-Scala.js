@@ -1,8 +1,8 @@
 package ch.epfl.k2sjsir.translate
 
 import ch.epfl.k2sjsir.SJSIRCodegen
-import ch.epfl.k2sjsir.utils.{GenExprUtils, NameEncoder}
 import ch.epfl.k2sjsir.utils.Utils._
+import ch.epfl.k2sjsir.utils.{GenExprUtils, NameEncoder}
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
@@ -18,7 +18,7 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, Extens
 import org.jetbrains.kotlin.resolve.{BindingContext, DescriptorUtils}
 import org.scalajs.core.ir.Trees
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{AnyType, ArrayType, ClassType, Type}
+import org.scalajs.core.ir.Types.{AnyType, ClassType}
 
 import scala.collection.JavaConverters._
 
@@ -31,8 +31,12 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case ks: KtStringTemplateExpression =>
         ks.getEntries.foldLeft(StringLiteral(""): Tree)((acc, expr) => {
           BinaryOp(BinaryOp.String_+, acc, expr match {
-            case sl: KtLiteralStringTemplateEntry => StringLiteral(sl.getText)
-            case st: KtStringTemplateEntry => GenExpr(st.getExpression).tree
+            case sl: KtLiteralStringTemplateEntry =>
+              StringLiteral(sl.getText)
+            case est: KtEscapeStringTemplateEntry =>
+              StringLiteral(est.getUnescapedValue)
+            case st: KtStringTemplateEntry =>
+              GenExpr(st.getExpression).tree
             case _ => notImplemented("after KtStringTemplateExpression")
           })
         })
