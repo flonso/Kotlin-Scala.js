@@ -14,10 +14,9 @@ import org.scalajs.core.ir.Types.AnyType
 case class GenParam(d: KtParameter)(implicit val c: TranslationContext) extends IRNodeGen[KtParameter, ParamDef] {
 
   override def tree: ParamDef = {
-    val name = Ident(d.getName)
-    val ptpe = BindingUtils.getDescriptorForElement(c.bindingContext(), d).asInstanceOf[VariableDescriptor]
-    val tpe = ptpe.getType.toJsType
-    ParamDef(name, tpe, d.isMutable, rest = false)
+    val paramDesc = BindingUtils.getDescriptorForElement(c.bindingContext(), d).asInstanceOf[VariableDescriptor]
+    val tpe = paramDesc.getType.toJsType
+    ParamDef(paramDesc.toJsIdent, tpe, d.isMutable, rest = false)
   }
 
 }

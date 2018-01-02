@@ -42,7 +42,11 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |ONE
         |Zero is Zero !
         |42 32 42
-        |Hello World
+        |Hello Worlddummy from parent
+        |dummy from child
+        |var a from super = 0
+        |var a from child = 1
+        |var b from super = 5
       """.stripMargin
 
     assertExecResult(result, Seq("classes/"), mainClass = "TestClassesKt")

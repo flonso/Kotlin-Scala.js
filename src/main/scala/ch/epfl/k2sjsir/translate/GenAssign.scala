@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
-import org.jetbrains.kotlin.resolve.scopes.receivers.{ClassValueReceiver, ExpressionReceiver, ImplicitClassReceiver, ThisClassReceiver}
+import org.jetbrains.kotlin.resolve.scopes.receivers._
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{ClassType, IntType, NoType}
 
@@ -39,7 +39,7 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
           val backingField = {
             val property = s.getPropertyDescriptor
             val thisTpe = DescriptorUtils.getClassDescriptorForType(property.getDispatchReceiverParameter.getType).toJsClassType
-            val name = property.getName.asString()
+            val name = property.toJsName
             val rcv = genThisFromContext(thisTpe)
 
             Select(rcv, Ident(name))(tpe)
@@ -48,12 +48,21 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
           Assign(backingField, right)
 
         case p: PropertyDescriptor =>
+          val isSuperCall = resolvedCall.getDispatchReceiver.isInstanceOf[SuperCallReceiverValue]
+
           val receiver = resolvedCall.getDispatchReceiver match {
-            case cl: ThisClassReceiver => genThisFromContext(cl.getType.toJsType, p)
+            case s: SuperCallReceiverValue => genThisFromContext(s.getType.toJsType, p)
+            case t: ThisClassReceiver => genThisFromContext(t.getType.toJsType, p)
             case cl: ClassValueReceiver => GenExpr(cl.getExpression).tree
             case e: ExpressionReceiver => GenExpr(e.getExpression).tree
             case _ if p.isTopLevel => null // Receiver is not used later in this case
             case _ => notImplemented("Unhandled receiver type (from PropertyDescriptor)")
+          }
+
+          val clsSuperTpe = receiver.tpe match {
+            case c: ClassType => c
+            case t if isSuperCall => throw new Exception(s"Super call found with type $t")
+            case _ => null
           }
 
           val methodIdent = p.getSetter.toJsMethodIdent
@@ -70,8 +79,11 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
                 ApplyStatic(clsTpe, methodIdent, List(args))(callRtpe)
 
               }
-              else
+              else if (isSuperCall) {
+                ApplyStatically(receiver, clsSuperTpe, methodIdent, List(args))(callRtpe)
+              } else {
                 Apply(receiver, methodIdent, List(args))(callRtpe)
+              }
 
             case KtTokens.EQ =>
               if (p.isTopLevel) {
@@ -79,8 +91,11 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
                 ApplyStatic(clsTpe, methodIdent, List(right))(callRtpe)
 
               }
-              else
+              else if (isSuperCall) {
+                ApplyStatically(receiver, clsSuperTpe, methodIdent, List(right))(callRtpe)
+              } else {
                 Apply(receiver, methodIdent, List(right))(callRtpe)
+              }
           }
 
           ret

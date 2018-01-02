@@ -216,14 +216,15 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       */
     val paramsInit = getPrimaryConstructorParameters(d)
       .asScala
-      .map(getPropertyDescriptorForConstructorParameter(c.bindingContext(), _))
-      .filter(_ != null)
-      .map(p => {
-        val name =  p.toJsIdent
-        val tpe = p.getType.toJsType
+      .filter(getPropertyDescriptorForConstructorParameter(c.bindingContext(), _) != null)
+      .map(param => {
+        val paramDesc = BindingUtils.getDescriptorForElement(c.bindingContext(), param)
+        val propDesc = getPropertyDescriptorForConstructorParameter(c.bindingContext(), param)
+        
+        val tpe = propDesc.getType.toJsType
         val rcv = genThisFromContext(desc.toJsClassType)
 
-        Assign(Select(rcv, name)(tpe), VarRef(name)(tpe))
+        Assign(Select(rcv, propDesc.toJsIdent)(tpe), VarRef(paramDesc.toJsIdent)(tpe))
       }).toList
 
     val declsInit: List[Tree] = d.getDeclarations.asScala
@@ -234,7 +235,7 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
             val expr = GenExpr(initExpr).tree
             val rcv = genThisFromContext(desc.toJsClassType)
 
-            Assign(Select(rcv, Ident(p.getName))(propDesc.getType.toJsType), expr)
+            Assign(Select(rcv, propDesc.toJsIdent)(propDesc.getType.toJsType), expr)
 
           case i: KtClassInitializer =>
             GenBody(i.getBody).tree
@@ -301,7 +302,7 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       val args = originArgs ++ enumArgs
 
       val ctorIdent = primary.toJsMethodIdent match {
-        case i@Ident(name, originalName) =>
+        case i: Ident =>
           if (desc.isEnumClass || desc.isEnumEntry)
             d.genEnumCtorIdent(desc)
           else

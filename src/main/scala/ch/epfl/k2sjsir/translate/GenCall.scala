@@ -1,15 +1,13 @@
 package ch.epfl.k2sjsir.translate
 
-import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
-import ch.epfl.k2sjsir.utils.NameEncoder._
+import ch.epfl.k2sjsir.utils.NameEncoder
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDescriptor, ClassDescriptor, SimpleFunctionDescriptor}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
-import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression}
+import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression, KtSuperExpression}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver, ReceiverValue}
 import org.jetbrains.kotlin.types.TypeUtils
@@ -66,6 +64,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
             val isLambdaCall = name == "invoke"
             val isDirectInvokeCall = d.getText.matches("^invoke[(].*[)]$")
             val isArray = receiver.tpe.isInstanceOf[ArrayType]
+            val isSuperCall = rcv.get.isInstanceOf[KtSuperExpression]
 
 
             if (DescriptorUtils.isExtension(desc)) {
@@ -100,6 +99,13 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                   }
                   else if (isLambdaCall && isDirectInvokeCall)
                     castJsFunctionApply(JSFunctionApply(receiver, args), desc)
+                  else if (isSuperCall) {
+                    val clsTpe = receiver.tpe match {
+                      case c:ClassType => c
+                      case t => throw new Exception(s"Got a super call with type $t")
+                    }
+                    ApplyStatically(receiver, clsTpe, name, args)(rtpe)
+                  }
                   else
                     Apply(receiver, name, args)(rtpe)
               }

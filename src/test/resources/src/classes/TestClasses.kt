@@ -31,21 +31,22 @@ fun myEnumTests() {
 }
 
 fun myInheritanceTest() {
-    val a = A(0, "hey")
-    val b = B(42)
+    val a = MyAClass(0, "hey")
+    val b = MyBClass(42)
     println("${b.a} ${b.b} ${b.c}")
 
     val empty = B2()
     empty.dummy()
 }
 
-fun myCompanionTest() {
-    //FIXME: This call should return the content of inner
-    //println(MyObjectClass.MyObject.inner)
+fun myClassWithSuperTest() {
+    val c = MyClassWithSuper()
+    c.test()
 }
 
 fun main(args: Array<String>) {
     myEnumTests()
     myInheritanceTest()
-    myCompanionTest()
+    myClassWithSuperTest()
+
 }

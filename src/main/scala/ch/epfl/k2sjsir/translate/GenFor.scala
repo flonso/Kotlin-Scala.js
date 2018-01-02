@@ -38,12 +38,12 @@ case class GenFor(d: KtForExpression)(implicit val c: TranslationContext) extend
   private val intProgressionName = new FqName("kotlin.ranges.IntProgression")
 
   override def tree: Trees.Tree = {
-    val ptpe = BindingUtils.getDescriptorForElement(c.bindingContext(), d.getLoopParameter).asInstanceOf[VariableDescriptor]
-    val tpe = ptpe.getType.toJsType
+    val loopParamDesc = BindingUtils.getDescriptorForElement(c.bindingContext(), d.getLoopParameter).asInstanceOf[VariableDescriptor]
+    val tpe = loopParamDesc.getType.toJsType
     val rangeType = BindingUtils.getTypeForExpression(c.bindingContext(), d.getLoopRange)
 
     val value: Tree => Tree =
-      i => VarDef(Ident(d.getLoopParameter.getName), tpe, mutable = false, i)
+      i => VarDef(loopParamDesc.toJsIdent, tpe, mutable = false, i)
 
     if (KotlinBuiltIns.isArray(rangeType) || KotlinBuiltIns.isPrimitiveArray(rangeType)) {
       val range = GenExpr(d.getLoopRange).tree

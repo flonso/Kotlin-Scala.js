@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.descriptors.{ClassDescriptor, PropertyDescriptor}
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi._
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{ArrayType, ClassRef, Type}
+import org.scalajs.core.ir.Types.{ArrayType, ClassRef, ClassType, Type}
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.scalajs.core.ir.Position
@@ -18,6 +18,7 @@ object GenExprUtils {
     val receiver = k.getReceiverExpression match {
       case qe: KtQualifiedExpression =>
         qe.getSelectorExpression
+
       case x => x
     }
 
@@ -56,7 +57,21 @@ object GenExprUtils {
                * ScalaJS IR.
                */
               val tpe = m.getType.toJsType
-              Apply(receiverExpr, m.getterIdent(), List())(tpe)
+
+              val getter = m.getterIdent()
+              val args = Nil
+
+              receiver match {
+                case _: KtSuperExpression =>
+                  val clsTpe = receiverExpr.tpe match {
+                    case c: ClassType => c
+                    case t => throw new Exception(s"Super expression with type $t")
+                  }
+
+                  ApplyStatically(receiverExpr, clsTpe, getter, args )(tpe)
+                case _ =>
+                  Apply(receiverExpr, getter, args)(tpe)
+              }
 
             case cls: ClassDescriptor =>
               if (cls.isEnumEntry) {

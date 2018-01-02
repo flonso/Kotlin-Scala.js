@@ -68,7 +68,6 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             else if(isObj)
               Apply(LoadModule(recv.toJsClassType), m.getterIdent(), List())(tpe)
             else if(DescriptorUtils.isLocal(m)) {
-              println("IS LOCAL")
               VarRef(m.toJsIdent)(m.getReturnType.toJsType)
             }
             else {
@@ -95,12 +94,12 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             }
           case lv: LocalVariableDescriptor =>
             val tpe = lv.getType.toJsType
-            val ident = Ident(kn.getReferencedNameAsName.toString)
+            val ident = lv.toJsIdent
             VarRef(ident)(tpe)
 
           case vd: ValueParameterDescriptor =>
             val tpe = vd.getType.toJsType
-            val ident = Ident(kn.getReferencedNameAsName.toString)
+            val ident = vd.toJsIdent
             VarRef(ident)(tpe)
 
           case lc: LazyClassDescriptor =>
@@ -165,9 +164,9 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         val content = GenBody(k.getTryBlock).tree
         val catches = k.getCatchClauses.asScala.map(ctch => ({
           val d = ctch.getCatchParameter
-          val ptpe = BindingUtils.getDescriptorForElement(c.bindingContext(), d).asInstanceOf[VariableDescriptor]
-          val tpe = ptpe.getType.toJsType
-          VarRef(Ident(d.getName))(tpe)
+          val varDesc = BindingUtils.getDescriptorForElement(c.bindingContext(), d).asInstanceOf[VariableDescriptor]
+          val tpe = varDesc.getType.toJsType
+          VarRef(varDesc.toJsIdent)(tpe)
         }, GenBody(ctch.getCatchBody).tree))
         val fnl = Option(k.getFinallyBlock).map(x => GenBody(x.getFinalExpression).tree)
 
@@ -205,6 +204,15 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
         genThisFromContext(tpe.toJsType, desc)
 
+      case k: KtSuperExpression =>
+        // This is a hack, super calls must be translated to ApplyStatically but
+        // here we know neither the method name nor the arguments.
+        // Super calls are therefore detected where Apply are generated
+        val tpe = c.bindingContext().getType(k)
+        val desc = DescriptorUtils.getClassDescriptorForType(tpe)
+
+        genThisFromContext(tpe.toJsType, desc)
+
       case b: KtBlockExpression =>
         GenBody(b).tree
 
@@ -237,7 +245,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
     val b0 : Tree = body.getOrElse({
       val static = DescriptorUtils.isStaticDeclaration(desc)
       val methodName = desc.toJsMethodIdent
-      val parameters = desc.getValueParameters.asScala.map(x => VarRef(Ident(x.getName.toString))(x.getType.toJsType)).toList
+      val parameters = desc.getValueParameters.asScala.map(x => VarRef(x.toJsIdent)(x.getType.toJsType)).toList
 
       if (static) ApplyStatic(ct, methodName, parameters)(desc.getReturnType.toJsType)
       else Apply(VarRef(Ident("$this"))(ct), methodName, parameters)(desc.getReturnType.toJsType)
@@ -266,9 +274,9 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
         val funcCaptureValues = funArgs.getOrElse(Nil)
           .map(x => {
-            val ptpe = BindingUtils.getDescriptorForElement(c.bindingContext(), x).asInstanceOf[VariableDescriptor]
-            val tpe = ptpe.getType.toJsType
-            VarRef(Ident(x.getName))(tpe)
+            val varDesc = BindingUtils.getDescriptorForElement(c.bindingContext(), x).asInstanceOf[VariableDescriptor]
+            val tpe = varDesc.getType.toJsType
+            VarRef(varDesc.toJsIdent)(tpe)
           })
 
         val captureParams = List(ParamDef(Ident("$this"), ct, mutable = false, rest = false)) ++ funcCaptureParams

@@ -16,6 +16,8 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
   protected val SCALA_JS_VERSION = "1.0.0-M2"
   protected val SCALA_JS_JAR = "scalajs-library_2.12-"+ SCALA_JS_VERSION +".jar"
 
+  protected val KOTLINJS_STD_LIB = ROOT_SOURCE + "/kotlin-stdlib"
+
   protected val KOTLIN_HOME = scala.util.Properties.envOrElse("KOTLIN_HOME", "/usr/share/kotlin" )
 
   private def cleanOutput(folder: File): Unit = {
@@ -56,6 +58,21 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
       .exec(System.err, Array(s"$ROOT_SOURCE/$srcFile", "-Xallow-kotlin-package", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME):_*)
     val content = Scalajsp.run(Array(s"$ROOT_OUT/$mainClass.sjsir"))
     assert(expected == content)
+  }
+
+  protected def compileAndCheckIr(sources: Seq[String], outFile: String = "out.js") = {
+    val files = sources.map(s => s"$ROOT_SOURCE/$s")
+    val options = Seq("-Xallow-kotlin-package", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME)
+
+    val exitCode = new K2SJSIRCompiler()
+      .exec(System.err,
+        (files ++ options):_*)
+
+
+    if (exitCode != ExitCode.OK)
+      fail(s"Compilation process finished with status $exitCode")
+
+    Scalajsld.run(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
   }
 
   protected def assertExecResult(expected: String, sources: Seq[String], outFile: String = "out.js", mainClass: String = "Test") = {

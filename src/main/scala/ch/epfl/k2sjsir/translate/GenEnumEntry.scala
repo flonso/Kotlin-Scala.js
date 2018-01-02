@@ -10,13 +10,13 @@ import org.scalajs.core.ir.Position
 
 case class GenEnumEntry(d: KtEnumEntry)(implicit val c: TranslationContext) extends IRNodeGen[KtEnumEntry, FieldDef] {
 
-  val desc = BindingUtils.getClassDescriptor(c.bindingContext(), d)
-  val entryIdent = desc.toJsIdent
-  val containingDesc = desc.getContainingDeclaration  match {
+  private val desc = BindingUtils.getClassDescriptor(c.bindingContext(), d)
+  private val entryIdent = desc.toJsIdent
+  private val containingDesc = desc.getContainingDeclaration  match {
     case cd: ClassDescriptor => cd
     case x => throw new Exception(s"Unexpected descriptor $x")
   }
-  val containingTpe = containingDesc.toJsClassType
+  private val containingTpe = containingDesc.toJsClassType
 
   override def tree: FieldDef = FieldDef(static = false, entryIdent, containingTpe, mutable = false)
 
@@ -27,7 +27,7 @@ case class GenEnumEntry(d: KtEnumEntry)(implicit val c: TranslationContext) exte
   private def genGetter: MethodDef = {
     val static = false
     val resultTpe = containingTpe
-    val getterIdent = Ident(entryIdent.name + "__" + containingTpe.className)
+    val getterIdent = Ident(d.getName + "__" + containingTpe.className)
     val args = Nil
 
     val body = genSelect

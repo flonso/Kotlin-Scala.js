@@ -56,7 +56,7 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
     } else {
 
       val opName = op match {
-        case KtTokens.IDENTIFIER => desc.toJsName
+        case KtTokens.IDENTIFIER => desc.getName.asString()
         case k: KtSingleValueToken => k.toString
         case _ => op.toString
       }

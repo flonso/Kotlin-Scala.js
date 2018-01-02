@@ -12,11 +12,14 @@ import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.NoType
 
+import scala.collection.JavaConverters._
+
+
 case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extends IRNodeGen[KtProperty, FieldDef] {
 
   import GenProperty._
 
-  val desc = BindingUtils.getPropertyDescriptor(c.bindingContext(), d)
+  private val desc = BindingUtils.getPropertyDescriptor(c.bindingContext(), d)
 
 
   override def tree: FieldDef = {
@@ -37,10 +40,6 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
     }
 
     t ++ genGetterAndSetter(isAbstract = false)
-  }
-
-  def withOnlyGetterAndSetter: List[MethodDef] = {
-    genGetterAndSetter(isAbstract = false)
   }
 
   def withAbstractGetterAndSetter: List[MethodDef] = {
@@ -140,14 +139,14 @@ object GenProperty {
     *       field = 0
     *   }
     */
-  private def setter(propAccessor: KtPropertyAccessor, desc: PropertyDescriptor, propGetterDesc: PropertySetterDescriptor, isAbstract: Boolean)(implicit c: TranslationContext, pos: Position): MethodDef = {
-    assert(propGetterDesc != null)
+  private def setter(propAccessor: KtPropertyAccessor, desc: PropertyDescriptor, propSetterDesc: PropertySetterDescriptor, isAbstract: Boolean)(implicit c: TranslationContext, pos: Position): MethodDef = {
+    assert(propSetterDesc != null)
 
     val rtpe = NoType // Kotlin setters always return Unit
     val isStatic = false
     val propTpe = desc.getType.toJsType
-    val methodIdent = propGetterDesc.toJsMethodDeclIdent
-    val setterIdent = Ident(s"value")
+    val methodIdent = propSetterDesc.toJsMethodDeclIdent
+    val setterIdent = propSetterDesc.getValueParameters.get(0).toJsIdent
     val params = List(ParamDef(setterIdent, desc.getType.toJsType, mutable = false, rest = false))
 
     val body = {

@@ -54,10 +54,10 @@ object GenClassUtils {
         .filter(x => x.hasModifier(KtTokens.OVERRIDE_KEYWORD))
         .map {
           case nf: KtNamedFunction =>
-            BindingUtils.getFunctionDescriptor(c.bindingContext(), nf).toJsName
+            BindingUtils.getFunctionDescriptor(c.bindingContext(), nf).getName.asString()
 
           case p: KtProperty =>
-            BindingUtils.getPropertyDescriptor(c.bindingContext(), p).toJsName
+            BindingUtils.getPropertyDescriptor(c.bindingContext(), p).getName.asString()
 
         }
         .toSet
@@ -75,14 +75,14 @@ object GenClassUtils {
       clsOrObj.getInterfaceInheritedDeclarations.collect {
         case p: KtProperty =>
           val pDesc = BindingUtils.getPropertyDescriptor(c.bindingContext(), p)
-          if (overriddenDeclarations.contains(pDesc.toJsName))
+          if (overriddenDeclarations.contains(pDesc.getName.asString()))
             Nil
           else
             List(p)
 
         case nf: KtNamedFunction =>
           val nfDesc = BindingUtils.getFunctionDescriptor(c.bindingContext(), nf)
-          if (overriddenDeclarations.contains(nfDesc.toJsName))
+          if (overriddenDeclarations.contains(nfDesc.getName.asString()))
             Nil
           else
             List(nf)
@@ -218,7 +218,7 @@ object GenClassUtils {
       val elems = entries.collect {
         case e: KtEnumEntry =>
           val enumEntryDesc = BindingUtils.getClassDescriptor(c.bindingContext(), e)
-          Select(genThisFromContext(desc.toJsEnumCompanionType), Ident(e.getName))(
+          Select(genThisFromContext(desc.toJsEnumCompanionType), enumEntryDesc.toJsIdent)(
             desc.toJsClassType)
       }.toList
       val thisValues = Select(genThisFromContext(desc.toJsEnumCompanionType), Ident(arrayValuesName))(arrayTpe)
@@ -235,7 +235,7 @@ object GenClassUtils {
             val ctorIdent = genEnumCtorIdent(desc)
             val args = Nil ++ List(StringLiteral(e.getName), IntLiteral(enumCardinality))
             val newCall = New(enumEntryDesc.toJsClassType, ctorIdent, args)
-            val select = Select(rcv, Ident(e.getName))(desc.toJsClassType)
+            val select = Select(rcv, enumEntryDesc.toJsIdent)(desc.toJsClassType)
 
             enumCardinality += 1
             // this.ENTRY = new Enum$ENTRY(...)
@@ -271,7 +271,7 @@ object GenClassUtils {
     */
     private def _genValueOfFunction: MemberDef = {
       val valueOfFunBody = {
-        val entries = clsOrObj.getDeclarations.asScala.filter(_.isInstanceOf[KtEnumEntry])
+        val entries = clsOrObj.getDeclarations.asScala.filter(_.isInstanceOf[KtEnumEntry]).map(_.asInstanceOf[KtEnumEntry])
 
         val lhs = VarRef(Ident(valueOfParamName))(ClassType("T"))
 
@@ -279,8 +279,10 @@ object GenClassUtils {
         val exception: Tree = Throw(New(ClassType("jl_IllegalStateException"), Ident("init___T"), List(exceptionMsg)))
 
         entries.foldLeft(exception){ (acc, entry) =>
+          val entryDesc = BindingUtils.getClassDescriptor(c.bindingContext(), entry)
+
           val rhs = StringLiteral(entry.getName)
-          val ret = Select(genThisFromContext(desc.toJsEnumCompanionType, desc), Ident(entry.getName))(desc.toJsClassType)
+          val ret = Select(genThisFromContext(desc.toJsEnumCompanionType, desc), entryDesc.toJsIdent)(desc.toJsClassType)
 
           val structEq = Apply(lhs, Ident("equals__O__Z"), List(rhs))(BooleanType)
 

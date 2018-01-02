@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.psi.{KtFile, KtProperty}
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyPackageDescriptor
+import org.jetbrains.kotlin.resolve.`lazy`.descriptors.{LazyClassDescriptor, LazyPackageDescriptor}
 import org.scalajs.core.ir
 
 import scala.collection.JavaConverters._
@@ -21,15 +21,24 @@ object Utils {
 
   implicit class DeclarationDescriptorTranslator(d: DeclarationDescriptor) {
     private val name = d.getName.asString()
+    private val numParents = getNbOfParentDeclarations
 
     def toJsClosureName: String = "closureargs$" + encodeName(name)
 
-    def toJsName: String = encodeName(name)
+    def toJsName: String = encodeName(name + numParents.map(n => "$" + n).getOrElse(""))
 
     def toJsIdent(implicit pos: Position): Ident = Ident(d.toJsName, Some(name))
 
     def toJsClosureIdent(implicit pos: Position): Ident = Ident(d.toJsClosureName, Some(name))
 
+    private def getNbOfParentDeclarations: Option[Int] = {
+      val count = d.getContainingDeclaration match {
+        case c: ClassDescriptor => DescriptorUtils.getSuperclassDescriptors(c).size()
+        case _ => 0
+      }
+
+      if (count == 0) None else Some(count)
+    }
   }
 
   implicit class CallableDescriptorTranslator(d: CallableDescriptor) {
