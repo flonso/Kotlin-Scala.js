@@ -61,7 +61,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     assert(expected == content)
   }
 
-  protected def compileAndCheckIr(sources: Seq[String], outFile: String = "out.js") = {
+  protected def compileAndCheckIr(sources: Seq[String], mainPath: String = "", outFile: String = "out.js") = {
     val files = sources.map(s => s"$ROOT_SOURCE/$s")
     val options = Seq("-Xallow-kotlin-package", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME)
 
@@ -73,7 +73,14 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     if (exitCode != ExitCode.OK)
       fail(s"Compilation process finished with status $exitCode")
 
-    Scalajsld.main(Array("--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR", ROOT_OUT, ROOT_LIB_OUT, "-o", s"$ROOT_OUT/$outFile", "-c"))
+    val mainMethod: List[String] = if (mainPath != "") List("-mm", mainPath) else Nil
+    val linkerArgs: List[String] = List(
+      "--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR",
+      ROOT_OUT, ROOT_LIB_OUT,
+      "-o", s"$ROOT_OUT/$outFile",
+      "-c"
+    )
+    Scalajsld.main((linkerArgs ++ mainMethod).toArray)
   }
 
   protected def assertExecResult(expected: String, sources: Seq[String], outFile: String = "out.js", mainClass: String = "Test") = {

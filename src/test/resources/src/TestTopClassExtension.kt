@@ -7,7 +7,7 @@ fun String.manyCount(other: String): Int {
     return count() + other.count()
 }
 
-object Test {
+object TopClassExtensionTester {
 
 
     fun main() {
@@ -22,6 +22,6 @@ object Test {
 
 object TestTopClassExtension {
     fun main(args: Array<String>) {
-        Test.main()
+        TopClassExtensionTester.main()
     }
 }

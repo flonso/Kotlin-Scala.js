@@ -258,7 +258,6 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArgs] {
 
     ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
 
-    // FIXME: Remove this call if it's not necessary (and remove the method)
     K2SJSIRCompilerArgs.dirtyCallToCompanion(translationResult.getDiagnostics, messageCollector)
 
     if (!translationResult.isInstanceOf[TranslationResult.Success])

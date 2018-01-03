@@ -1,6 +1,10 @@
 
 class BlackBoxSimpleTests extends BlackBoxTest {
 
+  test("TestDom.kt") {
+    compileAndCheckIr(Seq("dom"), "TestDom.main")
+  }
+
   test("TestLoops.kt") {
     val result =
       """
@@ -435,6 +439,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |32
         |D.bar
         |C.baz
+        |this is an extension function
+        |this is another extension function
       """.stripMargin, Seq("TestClassExtension.kt"), mainClass = "TestClassExtension.main")
   }
 

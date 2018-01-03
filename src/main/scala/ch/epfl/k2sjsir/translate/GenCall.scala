@@ -6,8 +6,8 @@ import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDes
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
-import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression, KtSuperExpression}
-import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression, KtFile, KtSuperExpression}
+import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils}
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver, ReceiverValue}
 import org.jetbrains.kotlin.types.TypeUtils
@@ -20,7 +20,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
 
   private val resolved = CallUtilKt.getResolvedCall(d, c.bindingContext())
   private val desc = resolved.getResultingDescriptor
-  private lazy val rtpe = desc.getReturnType.toJsType
+  private lazy val rtpe = desc.getOriginal.getReturnType.toJsType
   private val name = desc.getName.asString()
   private val args = genArgs().toList
 
@@ -83,7 +83,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
               // if the type is AnyType then its either a call to java.lang.Object or a JS call
               receiver match {
                 case _: LoadJSModule | _: JSNew =>
-                  JSBracketMethodApply(receiver, StringLiteral(name), args)
+                  cast(JSBracketMethodApply(receiver, StringLiteral(name), args), desc.getReturnType)
                 case _ =>
                   val name = if (desc.getName.toString == "invoke") NameEncoder.encodeApplyLambda(desc) else desc.toJsMethodIdent
 
@@ -242,11 +242,10 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
 
     } else {
       val o = desc.getExtensionReceiverParameter
-      val cnt = o.getContainingDeclaration
-      val name = JvmFileClassUtil.getFileClassInfoNoResolve(d.getContainingKtFile).getFileClassFqName.asString()
-      val encodedName = NameEncoder.encodeClassName(name, "")
+      val name = JvmFileClassUtil.getFileClassInfoNoResolve(d.getCalleeExpression.getContainingKtFile).getFileClassFqName.asString()
+      val file = DescriptorToSourceUtils.getSourceFromDescriptor(o.getContainingDeclaration).getContainingFile.asInstanceOf[KtFile]
 
-      val clsTpe = ClassType(encodedName)
+      val clsTpe = file.toJsClassType
 
       ApplyStatic(clsTpe, desc.toJsMethodIdent, receiver :: args)(rtpe)
     }

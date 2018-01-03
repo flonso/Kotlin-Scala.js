@@ -8,6 +8,8 @@ import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{ArrayType, ClassRef, ClassType, Type}
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
+import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt
 import org.scalajs.core.ir.Position
 
 object GenExprUtils {
@@ -56,6 +58,8 @@ object GenExprUtils {
                * We cannot do it above because it would prevent safe calls to type check in the
                * ScalaJS IR.
                */
+              val isExternal = m.hasExternalParent
+
               val tpe = m.getType.toJsType
 
               val getter = m.getterIdent()
@@ -69,6 +73,8 @@ object GenExprUtils {
                   }
 
                   ApplyStatically(receiverExpr, clsTpe, getter, args )(tpe)
+                case _ if isExternal =>
+                  JSBracketSelect(receiverExpr, StringLiteral(m.getName.asString()))
                 case _ =>
                   Apply(receiverExpr, getter, args)(tpe)
               }

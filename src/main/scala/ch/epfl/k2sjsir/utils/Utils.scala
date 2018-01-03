@@ -37,7 +37,7 @@ object Utils {
         case _ => 0
       }
 
-      if (count == 0) None else Some(count)
+      if (count == 0 || name == "<this>") None else Some(count)
     }
   }
 
@@ -61,6 +61,10 @@ object Utils {
     def isTopLevel: Boolean = d.getContainingDeclaration match {
       case _: LazyPackageDescriptor => true
       case _ => false
+    }
+
+    def hasExternalParent: Boolean = {
+      DescriptorUtils.getContainingClass(d).isExternal
     }
 
     def getNameEvenIfAnon: String = d.getName.toString.replace("<no name provided>", "anonymous")
@@ -189,7 +193,7 @@ object Utils {
 
   def cast(t: Tree, rtpe: KotlinType)(implicit pos: Position): Tree = {
     // TODO: Add a function to determine if it's a JS type
-    if (rtpe.toJsType == NoType || isLambdaType(rtpe)) {
+    if (rtpe.toJsType == NoType || isLambdaType(rtpe) || t.tpe == rtpe.toJsType) {
       t
     } else if (Utils.isPrimitiveType(rtpe.toJsType)) {
       Unbox(t, rtpe.toJsInternal.charAt(0))

@@ -142,16 +142,15 @@ object NameEncoder {
       case _ => None
     }
 
-    // TODO: replace kotlinaming with a call to DescriptorUtils.isAnonymousObject
     val paramsIntf = owner.fold("")(c => if (kotlinNaming && c.isInterface) c.toJsClassName else "")
-    val params0 = d.getValueParameters.asScala.map(_.toJsInternal)
+    val params0 = d.getOriginal.getValueParameters.asScala.map(_.toJsInternal)
     val x = d.getExtensionReceiverParameter
     val params1 =
       if (x == null) params0 else x.getReturnType.toJsInternal +: params0
     val params2 =
       if (isInit(d.getName.asString())) params1
       else if (reflProxy) params1 :+ ""
-      else params1 :+ d.getReturnType.toJsInternal
+      else params1 :+ d.getOriginal.getReturnType.toJsInternal
 
     val params = if (paramsIntf != "") paramsIntf +: params2 else params2
     params.mkString(OuterSep, OuterSep, "")

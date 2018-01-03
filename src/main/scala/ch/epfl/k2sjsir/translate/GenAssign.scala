@@ -65,6 +65,8 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
             case _ => null
           }
 
+          val isExternal = p.hasExternalParent
+
           val methodIdent = p.getSetter.toJsMethodIdent
           val callRtpe = NoType
 
@@ -94,7 +96,12 @@ case class GenAssign(d: KtBinaryExpression)(implicit val c: TranslationContext) 
               else if (isSuperCall) {
                 ApplyStatically(receiver, clsSuperTpe, methodIdent, List(right))(callRtpe)
               } else {
-                Apply(receiver, methodIdent, List(right))(callRtpe)
+                if (isExternal) {
+                  val slct = JSBracketSelect(receiver, StringLiteral(p.getName.asString()))
+                  Assign(slct, right)
+                }
+                else
+                  Apply(receiver, methodIdent, List(right))(callRtpe)
               }
           }
 

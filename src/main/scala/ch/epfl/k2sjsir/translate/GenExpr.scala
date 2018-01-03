@@ -7,8 +7,8 @@ import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
-import org.jetbrains.kotlin.js.translate.context.TranslationContext
-import org.jetbrains.kotlin.js.translate.utils.{BindingUtils, TranslationUtils}
+import org.jetbrains.kotlin.js.translate.context.{TranslationContext, UsageTracker, UsageTrackerKt}
+import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
@@ -87,6 +87,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                     Option(x.getDeclarationDescriptor.getDispatchReceiverParameter)
                       .getOrElse(x.getDeclarationDescriptor.getExtensionReceiverParameter)
                   val ref = VarRef(receiver.toJsIdent)(x.getType.toJsType)
+
                   Apply(ref, m.getterIdent(), List())(tpe)
 
                 case _: ImplicitClassReceiver =>
@@ -118,7 +119,8 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                 case _ => lc.isExternal
               }
             } else lc.isExternal
-            if(external) LoadJSModule(lc.toJsClassType)
+            if(external)
+              LoadJSModule(lc.toJsClassType)
             else {
               if (lc.isEnumClass)
                 LoadModule(lc.toJsEnumCompanionType)
@@ -209,7 +211,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
       case dw: KtDoWhileExpression =>
         val body = GenBody(dw.getBody).tree
         val cond = GenExpr(dw.getCondition).tree
-        DoWhile(cond, body)
+        DoWhile(body, cond)
 
       case k: KtIsExpression => GenIs(k).tree
       case k: KtThisExpression =>
