@@ -1,5 +1,6 @@
 open class Toto(b: Int) {
 
+    //FIXME: Omitting explicit call to this() (for class with no explicit primary constructor) leads to infinite loop
     constructor(b: Int, c: Int) :  this(b) {
         println(b)
         println(c)

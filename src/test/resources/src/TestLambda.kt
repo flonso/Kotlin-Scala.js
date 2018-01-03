@@ -46,6 +46,8 @@ class TestClass {
     }
 }
 
+fun Int.apply(p: () -> String) { p() }
+
 object TestLambda {
     fun main(args: Array<String>) {
         val myLocalLambda: () -> Unit = {

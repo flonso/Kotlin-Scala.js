@@ -23,6 +23,8 @@ interface MyMutableList<E> {
     fun <F>map(p: (E) -> F): LinkedList<F>
 
     fun joinToString(separator: String): String
+
+    fun iterator(): LinkedListIterator<E>
 }
 
 class Node<E>(var value: E, var next: Node<E>?) {
@@ -31,26 +33,43 @@ class Node<E>(var value: E, var next: Node<E>?) {
     }
 }
 
-class LinkedList<E>: MyMutableList<E> {
+class LinkedListIterator<E>(val head: Node<E>?) {
+    var currentNode = head
+
+    fun hasNext(): Boolean {
+        return currentNode != null
+    }
+
+    fun next(): E {
+        if (hasNext()) {
+            val ret = currentNode?.value
+            currentNode = currentNode?.next
+            return ret!!
+        } else {
+            throw Exception("Reached end of iterator")
+        }
+    }
+}
+
+class LinkedList<E>(): MyMutableList<E> {
     var head: Node<E>? = null
+    var elements = arrayOfNulls<Node<E>>(0)
 
     override val size: Int
         get() {
-            return _length(head)
+            return _length()
         }
 
     override val lastIndex: Int
         get() {
-            return _length(head) - 1
+            return _length() - 1
         }
 
-    constructor()
-
-    constructor(element: E) {
+    constructor(element: E): this() {
         head = Node(element, null)
     }
 
-    constructor(values: Array<E>) {
+    constructor(values: Array<E>): this() {
         for (v in values) {
             add(v)
         }
@@ -105,14 +124,19 @@ class LinkedList<E>: MyMutableList<E> {
         return node.value
     }
 
-    override fun get(index: Int): E = _get(index).value
+    override fun get(index: Int): E {
+        if (index >= size) throw Exception("Undefined index")
+        
+        return _get(index).value
+    }
 
     override fun indexOf(element: E): Int = _indexOf(element, head)
 
     override fun <F> map(p: (E) -> F): LinkedList<F> {
         val newList = LinkedList<F>()
-        for (i in 0 .. size) {
+        for (i in 0 until size) {
             val e = get(i)
+            println("mapping $e")
             newList.add(p(e))
         }
 
@@ -132,9 +156,18 @@ class LinkedList<E>: MyMutableList<E> {
         return ret
     }
 
-    private fun _length(node: Node<E>?): Int {
-        if (node == null) return 0
-        else return _length(node.next) + 1
+    override fun iterator(): LinkedListIterator<E> {
+        return LinkedListIterator<E>(head)
+    }
+
+    private fun _length(): Int {
+        var currentNode = head
+        var l = 0
+        while (currentNode != null) {
+            l += 1
+            currentNode = currentNode.next
+        }
+        return l;
     }
 
     private fun _contains(element: E, node: Node<E>?): Boolean {
@@ -156,19 +189,18 @@ class LinkedList<E>: MyMutableList<E> {
     }
 
     private fun _get(index: Int): Node<E> {
-        return _get(index, head, 0)
-    }
+        if (isEmpty() || index >= size) throw Exception("Undefined index")
 
-    private fun _get(index: Int, node: Node<E>?): Node<E> {
-        return _get(index, node, 0)
-    }
+        var node: Node<E> = head!!
 
-    private fun _get(index: Int, node: Node<E>?, currentIndex: Int): Node<E> {
-        if (node == null) throw Exception("Undefined index")
-        else {
-            if (currentIndex == index) return node
-            else return _get(index, node.next, currentIndex + 1)
+        for (i in 0 until size) {
+            if (index == i)
+                return node
+            else if (node.next != null)
+                node = node.next!!
         }
+
+        throw Exception("Couldn't get desired index $index")
     }
 
     override fun toString(): String {
@@ -177,18 +209,22 @@ class LinkedList<E>: MyMutableList<E> {
 }
 
 fun LinkedList<Int>.sum(): Int {
+    var currentNode = head
     var sum = 0
-    for (i in 0 until size) {
-        sum += get(i).toInt()
+    while (currentNode != null) {
+        sum += currentNode.value
+        currentNode = currentNode.next
     }
 
     return sum
 }
 
 fun LinkedList<Double>.sum(): Double {
+    var currentNode = head
     var sum = 0.0
-    for (i in 0 until size) {
-        sum += get(i).toDouble()
+    while (currentNode != null) {
+        sum += currentNode.value
+        currentNode = currentNode.next
     }
 
     return sum
@@ -210,6 +246,8 @@ object LinkedListRunner {
         }
         println(l)
 
+        println(l.map { it * 2 })
+
         l.remove(5)
         l.removeAt(0)
         l.removeAt(6)
@@ -228,5 +266,17 @@ object LinkedListRunner {
         println(l2)
         l2.remove(e1)
         println(l2)
+
+        val a = arrayOf("a", "b", "c")
+        val l3 = LinkedList<String>(a)
+
+        val j = l3.iterator()
+
+        while (j.hasNext()) {
+            val e: Any = j.next()
+            println(e.toString())
+        }
+
+
     }
 }

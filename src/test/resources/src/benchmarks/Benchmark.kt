@@ -30,7 +30,10 @@ abstract class Benchmark {
         println("$prefix: $status")
     }
 
-    private val performanceTime: Double = performance.now()
+    private val performanceTime: Double
+        get() {
+            return performance.now()
+        }
 
     /** This method should be implemented by the concrete benchmark.
      *  It will be called by the benchmarking code for a number of times.
@@ -46,7 +49,7 @@ abstract class Benchmark {
     fun runBenchmark(timeMinimum: Long, runsMinimum: Int): Pair {
         var runs = 0
         var enoughTime = false
-        val stopTime = performanceTime + timeMinimum.toLong() * 1000000L
+        val stopTime = performanceTime + timeMinimum
 
         val samples = LinkedList<Double>()
 
@@ -54,7 +57,8 @@ abstract class Benchmark {
             val startTime = performanceTime
             run()
             val endTime = performanceTime
-            samples.add((endTime - startTime) / 1000.0)
+
+            samples.add((endTime - startTime) * 1000.0)
             runs += 1
             enoughTime = endTime >= stopTime
         } while (!enoughTime || runs < runsMinimum)
@@ -72,8 +76,9 @@ abstract class Benchmark {
     private fun standardErrorOfTheMean(samples: LinkedList<Double>, mean: Double): Double {
         val n = samples.size.toDouble()
         var sum = 0.0
-        for (i in 0..samples.size) {
-            val xi = samples.get(i).toDouble()
+        val iter = samples.iterator()
+        while(iter.hasNext()) {
+            val xi = iter.next().toDouble()
             sum += Math.pow(xi - mean, 2.0)
         }
 
@@ -97,7 +102,7 @@ abstract class Benchmark {
     /** A string that is written at the beginning of the output line
      *  that contains the timings. By default, this is the class name.
      */
-    open val prefix: String = "Benchmark" // .getClass().getName()
+    open val prefix: String = "Benchmark"
 
     fun warmUp(): Unit {
         runBenchmark(1000, 10)

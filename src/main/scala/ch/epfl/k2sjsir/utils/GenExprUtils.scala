@@ -1,16 +1,14 @@
 package ch.epfl.k2sjsir.utils
 
 import ch.epfl.k2sjsir.translate.{GenCall, GenExpr}
+import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.{ClassDescriptor, PropertyDescriptor}
+import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi._
-import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.{ArrayType, ClassRef, ClassType, Type}
-import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.js.translate.context.TranslationContext
-import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt
 import org.scalajs.core.ir.Position
+import org.scalajs.core.ir.Trees._
+import org.scalajs.core.ir.Types.{ArrayType, ClassType, Type}
 
 object GenExprUtils {
   def genDotQualified(k: KtQualifiedExpression, notImplemented: String => Tree)(implicit c: TranslationContext, pos: Position): Tree = {
@@ -60,6 +58,7 @@ object GenExprUtils {
                */
               val isExternal = m.hasExternalParent
 
+              val originalTpe = m.getOriginal.getType
               val tpe = m.getType.toJsType
 
               val getter = m.getterIdent()
@@ -76,7 +75,7 @@ object GenExprUtils {
                 case _ if isExternal =>
                   JSBracketSelect(receiverExpr, StringLiteral(m.getName.asString()))
                 case _ =>
-                  Apply(receiverExpr, getter, args)(tpe)
+                  cast(Apply(receiverExpr, getter, args)(originalTpe.toJsType), m.getType())
               }
 
             case cls: ClassDescriptor =>

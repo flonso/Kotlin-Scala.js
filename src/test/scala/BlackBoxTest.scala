@@ -78,7 +78,8 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
       "--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR",
       ROOT_OUT, ROOT_LIB_OUT,
       "-o", s"$ROOT_OUT/$outFile",
-      "-c"
+      "-c",
+      "-u"
     )
     Scalajsld.main((linkerArgs ++ mainMethod).toArray)
   }

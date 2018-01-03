@@ -11,6 +11,7 @@ class BenchmarkTests extends BlackBoxTest {
         |true false
         |LinkedList(MyListEntry(value=3),MyListEntry(value=95))
         |LinkedList(MyListEntry(value=95))
+        |LinkedList(a,b,c)
       """.stripMargin
     assertExecResult(result,
       Seq(linkedListImpl), mainClass = "benchmarks.collections.LinkedListRunner.main")
@@ -21,7 +22,7 @@ class BenchmarkTests extends BlackBoxTest {
   }
 
   test("Benchmarks - LongMicro") {
-    compileAndCheckIr(Seq("benchmarks/LongMicro.kt", "benchmarks/Benchmark.kt", linkedListImpl), mainPath = "benchmarks.longmicro.LongMicroAll.main")
+    compileAndCheckIr(Seq("benchmarks/LongMicro.kt", "benchmarks/Benchmark.kt", linkedListImpl), "benchmarks.longmicro.LongMicroAll.main")
   }
 
 }

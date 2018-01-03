@@ -188,6 +188,9 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
   }
 
   private def genSecondaryConstructor(k: KtSecondaryConstructor) : MethodDef = {
+      /*
+       * Need to call the primary constructor in each secondary constructor
+       */
       val callSuper = {
         val delegationCall = CallUtilKt.getResolvedCall(k.getDelegationCall, c.bindingContext())
         val callDesc = delegationCall.getResultingDescriptor
@@ -220,7 +223,7 @@ case class GenClass(d: KtClassOrObject)(implicit val c: TranslationContext) exte
       .map(param => {
         val paramDesc = BindingUtils.getDescriptorForElement(c.bindingContext(), param)
         val propDesc = getPropertyDescriptorForConstructorParameter(c.bindingContext(), param)
-        
+
         val tpe = propDesc.getType.toJsType
         val rcv = genThisFromContext(desc.toJsClassType)
 
