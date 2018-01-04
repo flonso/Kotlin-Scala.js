@@ -64,7 +64,8 @@ object Utils {
     }
 
     def hasExternalParent: Boolean = {
-      DescriptorUtils.getContainingClass(d).isExternal
+      val cls = DescriptorUtils.getContainingClass(d)
+      cls != null && cls.isExternal
     }
 
     def getNameEvenIfAnon: String = d.getName.toString.replace("<no name provided>", "anonymous")

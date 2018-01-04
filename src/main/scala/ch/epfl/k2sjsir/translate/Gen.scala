@@ -5,9 +5,9 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.psi.KtElement
-import org.scalajs.core.ir.Position
+import org.scalajs.core.ir.{Definitions, Position}
 import org.scalajs.core.ir.Trees._
-import org.scalajs.core.ir.Types.AnyType
+import org.scalajs.core.ir.Types.{AnyType, ClassType}
 
 
 
@@ -27,7 +27,7 @@ trait IRNodeGen[T <: KtElement, TreeType <: IRNode] {
   private def notImplementedPrint(debugStr: String = "") = {
     val simpleName = getClass.getSimpleName
     val name = if (d != null) d.getClass.getSimpleName else ""
-    val msg = s"Not supported $simpleName: $name" + (if (!debugStr.isEmpty) s" with message $debugStr" else "") + s"at pos : $pos"
+    val msg = s"Not supported $simpleName: $name" + (if (!debugStr.isEmpty) s" with message $debugStr" else "") + s" at pos : $pos"
 
     val messageCollector = c.getConfig.getConfiguration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
     messageCollector.report(CompilerMessageSeverity.STRONG_WARNING, msg, null)
@@ -42,6 +42,11 @@ trait IRNodeGen[T <: KtElement, TreeType <: IRNode] {
   def notImplementedMemberDef(debugStr: String = ""): MemberDef = {
     notImplementedPrint(debugStr)
     FieldDef(false, Ident("debug"), AnyType, false)
+  }
+
+  def notImplementedReceiver(debugStr: String = ""): Tree = {
+    notImplementedPrint(debugStr)
+    This()(ClassType(Definitions.ObjectClass))
   }
 
 }

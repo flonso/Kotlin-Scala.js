@@ -153,7 +153,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                     else
                       GenExpr(e.getExpression).tree
 
-                  case _ => notImplemented("while looking for receiver")
+                  case _ => notImplementedReceiver("while looking for receiver")
 
                 }
 
