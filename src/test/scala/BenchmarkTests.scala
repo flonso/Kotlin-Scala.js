@@ -39,4 +39,8 @@ class BenchmarkTests extends BlackBoxTest {
     compileAndCheckIr(Seq("benchmarks/longmicro", "benchmarks/Benchmark.kt", linkedListImpl), "benchmarks.longmicro.LongMicroAll.main")
   }
 
+  test("Benchmarks - Richards") {
+    compileAndCheckIr(Seq("benchmarks/richards", "benchmarks/Benchmark.kt", linkedListImpl), "benchmarks.richards.Richards.main")
+  }
+
 }

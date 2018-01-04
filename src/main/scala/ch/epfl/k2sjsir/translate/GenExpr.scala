@@ -65,6 +65,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
             }
 
             val isObj = recv != null && (recv.isCompanionObject || DescriptorUtils.isObject(recv))
+            val insideDeclaringObject = recv != null && m.getContainingDeclaration == recv
 
             if(m.isTopLevel) {
               val name = JvmFileClassUtil.getFileClassInfoNoResolve(d.getContainingKtFile).getFileClassFqName.asString()
@@ -74,8 +75,9 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
               ApplyStatic(clsTpe, m.getterIdent(), Nil)(m.getType.toJsType)
             }
-            else if(isObj)
+            else if(isObj && !insideDeclaringObject) {
               Apply(LoadModule(recv.toJsClassType), m.getterIdent(), List())(tpe)
+            }
             else if(DescriptorUtils.isLocal(m)) {
               VarRef(m.toJsIdent)(m.getReturnType.toJsType)
             }

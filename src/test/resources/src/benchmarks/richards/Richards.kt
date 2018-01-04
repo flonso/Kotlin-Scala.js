@@ -44,16 +44,22 @@
 // The benchmark was originally implemented in BCPL by
 // Martin Richards.
 
-package richards
+package benchmarks.richards
+
+import benchmarks.Benchmark
+
+fun main(args: Array<String>) {
+    Richards.main(args)
+}
 
 /**
  * Richards simulates the task dispatcher of an operating system.
  */
-object Richards {
+object Richards: Benchmark() {
 
-    fun prefix() = "Richards"
+    override val prefix: String = "Richards"
 
-    fun run() {
+    override fun run() {
         val scheduler = Scheduler()
         scheduler.addIdleTask(ID_IDLE, 0, null, COUNT)
 
@@ -165,11 +171,12 @@ class Scheduler {
     fun schedule() {
         currentTcb = list
         while (currentTcb != null) {
-            if (currentTcb!!.isHeldOrSuspended()) {
-                currentTcb = currentTcb!!.link
+            val tmpTcb = currentTcb!!
+            if (tmpTcb.isHeldOrSuspended()) {
+                currentTcb = tmpTcb.link
             } else {
-                currentId = currentTcb!!.id
-                currentTcb = currentTcb!!.run()
+                currentId = tmpTcb.id
+                currentTcb = tmpTcb.run()
             }
         }
     }
@@ -192,8 +199,9 @@ class Scheduler {
      */
     fun holdCurrent(): TaskControlBlock? {
         holdCount += 1
-        currentTcb!!.markAsHeld()
-        return currentTcb!!.link
+        val tmpTcb = currentTcb!!
+        tmpTcb.markAsHeld()
+        return tmpTcb.link
     }
 
     /**
@@ -211,8 +219,8 @@ class Scheduler {
      * associated with the packet and make the task runnable if it is currently
      * suspended.
      */
-    fun queue(packet: Packet?): TaskControlBlock? {
-        val t = blocks[packet!!.id]
+    fun queue(packet: Packet): TaskControlBlock? {
+        val t = blocks[packet.id]
         if (t == null) return t
         else {
             queueCount += 1
@@ -240,7 +248,7 @@ object TaskState {
     final val HELD = 4
 
     final val SUSPENDED_RUNNABLE = SUSPENDED or RUNNABLE
-    final val NOT_HELD = HELD.inv()
+    final val NOT_HELD = -5
 }
 
 /**
@@ -281,7 +289,7 @@ class TaskControlBlock(val link: TaskControlBlock?, val id: Int, val priority: I
     }
 
     /// Runs this task, if it is ready to be run, and returns the next task to run.
-    fun run(): TaskControlBlock {
+    fun run(): TaskControlBlock? {
         val packet = if (state == TaskState.SUSPENDED_RUNNABLE) queue else null
         if (packet != null) {
             queue = packet.link
@@ -316,7 +324,7 @@ class TaskControlBlock(val link: TaskControlBlock?, val id: Int, val priority: I
  * @param scheduler	  The scheduler that manages this task.
  */
 sealed abstract class Task(val scheduler: Scheduler) {
-    abstract fun run(packet: Packet?): TaskControlBlock
+    abstract fun run(packet: Packet?): TaskControlBlock?
 }
 
 /**
@@ -328,16 +336,16 @@ sealed abstract class Task(val scheduler: Scheduler) {
  */
 class IdleTask(scheduler: Scheduler, var v1: Int, var count: Int) : Task(scheduler) {
 
-    override fun run(packet: Packet?): TaskControlBlock {
+    override fun run(packet: Packet?): TaskControlBlock? {
         count -= 1
         if (count == 0) {
-            return scheduler.holdCurrent()!!
+            return scheduler.holdCurrent()
         } else if ((v1 and 1) == 0) {
             v1 = v1 shr 1
-            return scheduler.release(Richards.ID_DEVICE_A)!!
+            return scheduler.release(Richards.ID_DEVICE_A)
         } else {
             v1 = (v1 shr 1) xor 0xD008
-            return scheduler.release(Richards.ID_DEVICE_B)!!
+            return scheduler.release(Richards.ID_DEVICE_B)
         }
     }
 
@@ -351,18 +359,18 @@ class DeviceTask(scheduler: Scheduler) : Task(scheduler) {
 
     var v1: Packet? = null
 
-    override fun run(packet: Packet?): TaskControlBlock {
+    override fun run(packet: Packet?): TaskControlBlock? {
         if (packet == null) {
             if (v1 == null)
-                return scheduler.suspendCurrent()!!
+                return scheduler.suspendCurrent()
             else {
-                val v = v1
+                val v = v1!!
                 v1 = null
-                return scheduler.queue(v)!!
+                return scheduler.queue(v)
             }
         } else {
             v1 = packet
-            return scheduler.holdCurrent()!!
+            return scheduler.holdCurrent()
         }
     }
 
@@ -376,9 +384,9 @@ class DeviceTask(scheduler: Scheduler) : Task(scheduler) {
  */
 class WorkerTask(scheduler: Scheduler, var v1: Int, var v2: Int) : Task(scheduler) {
 
-    override fun run(packet: Packet?): TaskControlBlock {
+    override fun run(packet: Packet?): TaskControlBlock? {
         if (packet == null) {
-            return scheduler.suspendCurrent()!!
+            return scheduler.suspendCurrent()
         } else {
             if (v1 == Richards.ID_HANDLER_A) {
                 v1 = Richards.ID_HANDLER_B
@@ -392,7 +400,7 @@ class WorkerTask(scheduler: Scheduler, var v1: Int, var v2: Int) : Task(schedule
                 if (v2 > 26) v2 = 1
                 packet.a2[i] = v2
             }
-            return scheduler.queue(packet)!!
+            return scheduler.queue(packet)
         }
     }
 
@@ -406,7 +414,7 @@ class HandlerTask(scheduler: Scheduler) : Task(scheduler) {
     var v1: Packet? = null
     var v2: Packet? = null
 
-    override fun run(packet: Packet?): TaskControlBlock {
+    override fun run(packet: Packet?): TaskControlBlock? {
         if (packet != null) {
             if (packet.kind == Richards.KIND_WORK) {
                 v1 = packet.addTo(v1)
@@ -415,26 +423,28 @@ class HandlerTask(scheduler: Scheduler) : Task(scheduler) {
             }
         }
 
-        val tmpv1 = v1
-        if (tmpv1 != null) {
-            val count = v1!!.a1
+        val v1AsVal = v1
+        if (v1AsVal != null) {
+            val count = v1AsVal.a1
 
             if (count < Richards.DATA_SIZE) {
-                if (v2 != null) {
-                    val v = v2
-                    v2 = v2!!.link
-                    v!!.a1 = (tmpv1.a2[count])!!
-                    tmpv1.a1 = (count + 1)
-                    return scheduler.queue(v)!!
+                val v2AsVal = v2
+                if (v2AsVal != null) {
+                    val v = v2AsVal
+                    v2 = v2AsVal.link
+                    val c = v1AsVal.a2[count]
+                    v.a1 = c!!.toInt()
+                    v1AsVal.a1 = (count + 1)
+                    return scheduler.queue(v)
                 }
             } else {
-                val v = v1
-                v1 = v1!!.link
-                return scheduler.queue(v)!!
+                val vTmp = v1AsVal
+                v1 = v1AsVal.link
+                return scheduler.queue(vTmp)
             }
         }
 
-        return scheduler.suspendCurrent()!!
+        return scheduler.suspendCurrent()
     }
 
 }
@@ -463,7 +473,8 @@ class Packet(var link: Packet?, var id: Int, val kind: Int) {
         } else {
             var next = queue
             while (next!!.link != null)
-                next = next.link!!
+                next = next.link
+
             next.link = this
             return queue
         }
