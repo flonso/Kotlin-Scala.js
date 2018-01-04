@@ -49,6 +49,10 @@ import benchmarks.collections.Stack
  * I've kept it this way to avoid deviating too much from the original
  * implementation.
  */
+fun main(args: Array<String>) {
+    DeltaBlue.main(args)
+}
+
 object DeltaBlue: Benchmark() {
 
     override val prefix = "DeltaBlue"
@@ -71,7 +75,7 @@ object DeltaBlue: Benchmark() {
      * of course, very low. Typical situations lie somewhere between these
      * two extremes.
      */
-    fun chainTest(n: Int) {
+    private fun chainTest(n: Int) {
         val planner = Planner()
         var prev: Variable? = null
         var first: Variable? = null
@@ -89,12 +93,11 @@ object DeltaBlue: Benchmark() {
         StayConstraint(last!!, STRONG_DEFAULT, planner)
         val edit = EditConstraint(first!!, PREFERRED, planner)
         val plan = planner.extractPlanFromConstraints(LinkedList<Constraint>(edit))
-        for (i in 0 until 100) {
-            first.value = i
+        for (j in 0 until 100) {
+            first.value = j
             plan.execute()
-            if (last.value != i) {
-                val t = last.value
-                print("Chain test failed.\n$t)\n$i")
+            if (last.value != j) {
+                print("Chain test failed.\n${last.value})\n$j")
             }
         }
     }
@@ -105,9 +108,9 @@ object DeltaBlue: Benchmark() {
      * time is measured to change a variable on either side of the
      * mapping and to change the scale and offset factors.
      */
-    fun projectionTest(n: Int) {
+    private fun projectionTest(n: Int) {
         val planner = Planner()
-        val scale = Variable("scale", 10)
+        val scale: Variable = Variable("scale", 10)
         val offset = Variable("offset", 1000)
         var src: Variable? = null
         var dst: Variable? = null
@@ -120,27 +123,35 @@ object DeltaBlue: Benchmark() {
             StayConstraint(src, NORMAL, planner)
             ScaleConstraint(src, scale, offset, dst, REQUIRED, planner)
         }
+
         change(src!!, 17, planner)
+
         if (dst!!.value != 1170) print("Projection 1 failed")
+
         change(dst, 1050, planner)
+
         if (src.value != 5) print("Projection 2 failed")
+
         change(scale, 5, planner)
-        for (i in 0 until n - 1) {
-            if (dests[i]!!.value != i * 5 + 1000) print("Projection 3 failed")
+
+        for (j in 0 until n - 1) {
+            if (dests[j]!!.value != j * 5 + 1000) print("Projection 3 failed")
         }
+
         change(offset, 2000, planner)
-        for (i in 0 until n - 1) {
-            if (dests[i]!!.value != i * 5 + 2000) print("Projection 4 failed")
+
+        for (k in 0 until n - 1) {
+            if (dests[k]!!.value != k * 5 + 2000) print("Projection 4 failed")
         }
     }
 
-    fun change(v: Variable, newValue: Int, planner: Planner) {
+    private fun change(v: Variable, newValue: Int, planner: Planner) {
         val edit = EditConstraint(v, PREFERRED, planner)
         val plan = planner.extractPlanFromConstraints(LinkedList(edit))
         for (i in 0 until 10) {
-        v.value = newValue
-        plan.execute()
-    }
+            v.value = newValue
+            plan.execute()
+        }
         edit.destroyConstraint()
     }
 }
@@ -159,25 +170,23 @@ sealed class Strength(val value: Int, val name: String) {
         3 -> NORMAL
         4 -> WEAK_DEFAULT
         5 -> WEAKEST
-        else -> {
-            throw Exception("Unknown Strength value")
-        }
+        else -> null
     }
 
     // Compile time computed constants.
     companion object Companion {
 
         fun stronger(s1: Strength, s2: Strength): Boolean =
-        s1.value < s2.value
+            s1.value < s2.value
 
         fun weaker(s1: Strength, s2: Strength): Boolean =
-        s1.value > s2.value
+            s1.value > s2.value
 
         fun weakest(s1: Strength, s2: Strength) =
-        if (weaker(s1, s2)) s1 else s2
+            if (weaker(s1, s2)) s1 else s2
 
         fun strongest(s1: Strength, s2: Strength) =
-        if (stronger(s1, s2)) s1 else s2
+            if (stronger(s1, s2)) s1 else s2
     }
 }
 
@@ -349,10 +358,6 @@ abstract class BinaryConstraint(val v1: Variable, val v2: Variable, strength: St
 
     protected var direction = Direction.NONE
 
-    init {
-        addConstraint()
-    }
-
     /**
      * Decides if this constraint can be satisfied and which way it
      * should flow based on the relative strength of the variables related,
@@ -446,9 +451,11 @@ abstract class BinaryConstraint(val v1: Variable, val v2: Variable, strength: St
  * read-only.
  */
 
-class ScaleConstraint(v1: Variable, val scale: Variable, val offset: Variable,
-                      v2: Variable, strength: Strength, planner: Planner)
-    : BinaryConstraint(v1, v2, strength, planner) {
+class ScaleConstraint(v1: Variable, val scale: Variable, val offset: Variable, v2: Variable, strength: Strength, planner: Planner): BinaryConstraint(v1, v2, strength, planner) {
+
+    init {
+        addConstraint()
+    }
 
     /// Adds this constraint to the constraint graph.
     override fun addToGraph() {
@@ -498,6 +505,11 @@ class ScaleConstraint(v1: Variable, val scale: Variable, val offset: Variable,
  * Constrains two variables to have the same value.
  */
 class EqualityConstraint(v1: Variable, v2: Variable, strength: Strength, planner: Planner) : BinaryConstraint(v1, v2, strength, planner) {
+
+    init {
+        addConstraint()
+    }
+
     /// Enforce this constraint. Assume that it is satisfied.
     override fun execute() {
         output().value = input().value
@@ -576,11 +588,12 @@ class Planner {
         val unsatisfied = removePropagateFrom(out)
         var strength: Strength = REQUIRED
         do {
-            for (i in 0..unsatisfied.size) {
-                val u = unsatisfied.get(i)
+            val iter = unsatisfied.iterator()
+            while(iter.hasNext()){
+                val u = iter.next() as Constraint
                 if (u.strength == strength) incrementalAdd(u)
             }
-            strength = strength.nextWeaker
+            strength = strength.nextWeaker!!
         } while (strength != WEAKEST)
     }
 
@@ -614,7 +627,7 @@ class Planner {
         val plan = Plan()
         val todo = sources
         while (!todo.isEmpty()) {
-            val c = todo.pop()
+            val c = todo.pop() as Constraint
             if (c.output().mark != mark && c.inputsKnown(mark)) {
                 plan.addConstraint(c)
                 c.output().mark = mark
@@ -630,8 +643,9 @@ class Planner {
      */
     fun extractPlanFromConstraints(constraints: LinkedList<Constraint>): Plan {
         val sources = Stack<Constraint>()
-        for (i in 0 .. constraints.size) {
-            val c = constraints.get(i)
+        val iter = constraints.iterator()
+        while(iter.hasNext()) {
+            val c = iter.next() as Constraint
             // if not in plan already and eligible for inclusion.
             if (c.isInput() && c.isSatisfied()) sources.push(c)
         }
@@ -654,7 +668,7 @@ class Planner {
     fun addPropagate(c: Constraint, mark: Int): Boolean {
         val todo = Stack<Constraint>().push(c)
         while (!todo.isEmpty()) {
-            val d = todo.pop()
+            val d = todo.pop() as Constraint
             if (d.output().mark == mark) {
                 incrementalRemove(c)
                 return false
@@ -677,14 +691,16 @@ class Planner {
         val unsatisfied = LinkedList<Constraint>()
         val todo = Stack<Variable>().push(out)
         while (!todo.isEmpty()) {
-            val v = todo.pop()
-            for (i in 0 .. v.constraints.size) {
-                val c = v.constraints.get(i)
+            val v = todo.pop() as Variable
+            val iter = v.constraints.iterator()
+            while (iter.hasNext()){
+                val c = iter.next() as Constraint
                 if (!c.isSatisfied()) unsatisfied.add(c)
             }
             val determining = v.determinedBy
-            for (j in 0 .. v.constraints.size) {
-                val next = v.constraints.get(j)
+            val iter2 = v.constraints.iterator()
+            while (iter2.hasNext()) {
+                val next = iter2.next() as Constraint
                 if (next != determining && next.isSatisfied()) {
                     next.recalculate()
                     todo.push(next.output())
@@ -696,8 +712,9 @@ class Planner {
 
     fun addConstraintsConsumingTo(v: Variable, coll: Stack<Constraint>) {
         val determining = v.determinedBy
-        for (i in 0 .. v.constraints.size) {
-            val c = v.constraints.get(i)
+        val iter = v.constraints.iterator()
+        while (iter.hasNext()) {
+            val c = iter.next() as Constraint
             if (c != determining && c.isSatisfied()) coll.push(c)
         }
     }
@@ -716,8 +733,9 @@ class Plan {
     }
 
     fun execute() {
-        for (i in 0..list.size) {
-            val constraint = list.get(i)
+        val iter = list.iterator()
+        while (iter.hasNext()) {
+            val constraint = iter.next() as Constraint
             constraint.execute()
         }
     }

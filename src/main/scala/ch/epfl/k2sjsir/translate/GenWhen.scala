@@ -11,6 +11,8 @@ import scala.collection.JavaConverters._
 
 case class GenWhen(d: KtWhenExpression)(implicit val c: TranslationContext) extends Gen[KtWhenExpression] {
 
+  val tpe = BindingUtils.getTypeForExpression(c.bindingContext(), d)
+
   override def tree: Tree = {
     val sub = GenExpr(d.getSubjectExpression).tree
     val es = d.getEntries.asScala.toList
@@ -42,7 +44,7 @@ case class GenWhen(d: KtWhenExpression)(implicit val c: TranslationContext) exte
     case h :: t =>
       val cond = genConditions(sub)(h.getConditions.toList)
       val exp = GenExpr(h.getExpression).tree
-      If(cond, exp, genWhenEntry(sub)(t))(exp.tpe)
+      If(cond, exp, genWhenEntry(sub)(t))(this.tpe.toJsType)
     case _ => Undefined()
   }
 

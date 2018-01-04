@@ -32,7 +32,7 @@ class BenchmarkTests extends BlackBoxTest {
   }
 
   test("Benchmarks - DeltaBlue") {
-    compileAndCheckIr(Seq("benchmarks/deltablue", "benchmarks/Benchmark.kt", linkedListImpl, stackImpl), "")
+    compileAndCheckIr(Seq("benchmarks/deltablue", "benchmarks/Benchmark.kt", linkedListImpl, stackImpl), "benchmarks.deltablue.DeltaBlue.main")
   }
 
   test("Benchmarks - LongMicro") {
