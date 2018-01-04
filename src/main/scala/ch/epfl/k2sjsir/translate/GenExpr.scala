@@ -63,9 +63,14 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
               else
                 null
             }
+            // Check is the receiver is the instance of the current class or not
 
             val isObj = recv != null && (recv.isCompanionObject || DescriptorUtils.isObject(recv))
-            val insideDeclaringObject = recv != null && m.getContainingDeclaration == recv
+
+            val enclosingDesc = BindingContextUtils.getEnclosingDescriptor(c.bindingContext(), kn)
+            val enclosingClass = DescriptorUtils.getContainingClass(enclosingDesc)
+
+            val insideDeclaringObject = recv != null && enclosingClass != null && enclosingClass == recv
 
             if(m.isTopLevel) {
               val name = JvmFileClassUtil.getFileClassInfoNoResolve(d.getContainingKtFile).getFileClassFqName.asString()
@@ -92,11 +97,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
                   Apply(ref, m.getterIdent(), List())(tpe)
 
-                case _: ImplicitClassReceiver =>
-                  val rcv = genThisFromContext(recv.toJsClassType, m)
-                  Apply(rcv, m.getterIdent(), List())(tpe)
-
-                case x: ExpressionReceiver =>
+                case _: ImplicitClassReceiver | _: ExpressionReceiver =>
                   val rcv = genThisFromContext(recv.toJsClassType, m)
                   Apply(rcv, m.getterIdent(), List())(tpe)
 

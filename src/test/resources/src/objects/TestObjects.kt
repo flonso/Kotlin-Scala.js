@@ -1,6 +1,8 @@
 
 object SomeObject {
     val inner = "someobject inner value"
+    
+    val some = inner
 }
 
 
