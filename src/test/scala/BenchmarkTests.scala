@@ -43,4 +43,8 @@ class BenchmarkTests extends BlackBoxTest {
     compileAndCheckIr(Seq("benchmarks/richards", "benchmarks/Benchmark.kt", linkedListImpl), "benchmarks.richards.Richards.main")
   }
 
+  test("Benchmarks - SHA512") {
+    compileAndCheckIr(Seq("benchmarks/sha512", linkedListImpl), "benchmarks.sha512.BenchRunner.main")
+  }
+
 }

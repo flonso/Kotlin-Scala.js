@@ -196,7 +196,9 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
         If(cond, thenB, elseB.getOrElse(Skip()))(ifTpe)
 
-      case k: KtReturnExpression => Return(GenExpr(k.getReturnedExpression).tree)
+      case k: KtReturnExpression =>
+        val retExpr = if (k.getReturnedExpression != null) GenExpr(k.getReturnedExpression).tree else Undefined()
+        Return(retExpr)
       case k: KtWhenExpression => GenWhen(k).tree
       case kp: KtParenthesizedExpression => GenExpr(kp.getExpression).tree
       case kc: KtCallableReferenceExpression =>
@@ -234,7 +236,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
 
       case k: KtDestructuringDeclaration =>
         for {
-          entry: KtDestructuringDeclarationEntry <- k.getEntries.asScala.toList;
+          entry: KtDestructuringDeclarationEntry <- k.getEntries.asScala.toList
           varDesc: VariableDescriptor = BindingContextUtils.getNotNull(c.bindingContext(), BindingContext.VARIABLE, entry)
           if !varDesc.getName.isSpecial
         } yield {

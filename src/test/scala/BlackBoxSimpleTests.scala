@@ -26,6 +26,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |nothing to be done, inside anonymous object
         |printing something
         |publicFoo.AnonymousObjects$NoNameProvided@1 foo.x publicFooWithClass.x publicFooWithInterface.x
+        |Hello World with 3
         |Hello from an object
         |Hello from a companion object
         |some new inner value

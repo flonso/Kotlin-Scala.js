@@ -1,7 +1,7 @@
 
 object SomeObject {
     val inner = "someobject inner value"
-    
+
     val some = inner
 }
 
@@ -15,6 +15,9 @@ object TestObjects {
         // Anonymous object
         val a = AnonymousObjects()
         a.bar()
+
+        val tmp = MyObjectClass("My inner value")
+        println(tmp.helloWorld)
 
         // Companion objects
         println(myfun().inner)

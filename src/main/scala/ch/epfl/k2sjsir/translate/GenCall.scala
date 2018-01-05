@@ -37,7 +37,10 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
           }
         }
 
-        if(!cc.getContainingDeclaration.isExternal)
+        // TODO: Remove this first if when using the stdlib
+        if (GenArray.isNewKtArray(desc))
+          GenArray(d, args).tree
+        else if(!cc.getContainingDeclaration.isExternal)
           New(ctpe, desc.toJsMethodIdent, args)
         else
           JSNew(LoadJSConstructor(ctpe), args)
@@ -141,7 +144,11 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
               else {
                 val receiver = dispatchReceiver match {
                   case i: ImplicitClassReceiver =>
-                    genThisFromContext(i.getClassDescriptor.toJsClassType)
+                    val cls = i.getClassDescriptor
+                    if (cls.isCompanionObject)
+                      LoadModule(cls.toJsClassType)
+                    else
+                      genThisFromContext(i.getClassDescriptor.toJsClassType)
 
                   case _: ExtensionReceiver =>
                     val dr = desc.getDispatchReceiverParameter

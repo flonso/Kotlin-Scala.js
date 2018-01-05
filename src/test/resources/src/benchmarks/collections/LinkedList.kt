@@ -136,7 +136,6 @@ class LinkedList<E>(): MyMutableList<E> {
         val newList = LinkedList<F>()
         for (i in 0 until size) {
             val e = get(i)
-            println("mapping $e")
             newList.add(p(e))
         }
 
@@ -230,7 +229,6 @@ fun LinkedList<Double>.sum(): Double {
     return sum
 }
 
-
 class MyListEntry(val value: Int) {
     override fun toString(): String {
         return "MyListEntry(value=$value)"
@@ -246,7 +244,10 @@ object LinkedListRunner {
         }
         println(l)
 
-        println(l.map { it * 2 })
+        println(l.map {
+            println("mapping $it")
+            it * 2
+        })
 
         l.remove(5)
         l.removeAt(0)
@@ -276,7 +277,5 @@ object LinkedListRunner {
             val e: Any = j.next()
             println(e.toString())
         }
-
-
     }
 }
