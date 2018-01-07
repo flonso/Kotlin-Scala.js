@@ -126,7 +126,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         }
 
         val _name: String = "name"
-        def name(): String = _name
+        def name: String = _name
 
         val id: Int = 1
 
@@ -151,12 +151,12 @@ class BlackBoxSimpleTests extends BlackBoxTest {
       printlnJSFormat(a.tmp)
       a.tmp = "tmp2"
       printlnJSFormat(a.tmp)
+      printlnJSFormat("customSet\nnot_using_default_parameter_name_set")
     }
 
     assertExecResult(res, Seq("TestAccessorsGen.kt"), mainClass = "TestAccessorsGen.main")
   }
 
-  // TODO: Complete this test
   test("TestThisKeyword.kt") {
     val res =
       """

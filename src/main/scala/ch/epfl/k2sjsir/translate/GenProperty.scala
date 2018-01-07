@@ -117,7 +117,6 @@ object GenProperty {
       }
     }
 
-    // FIXME: Dirty hack to pass instance of interface to the default implementation
     val args = {
       if (cd != null && isInterface(cd))
         List(ParamDef(Ident("$this"), cd.toJsClassType, false, false))

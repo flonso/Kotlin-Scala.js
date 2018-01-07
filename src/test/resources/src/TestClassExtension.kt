@@ -44,6 +44,8 @@ fun MyClassWithExtension.usingThis(): Double {
 
 fun String.myExtendedFun(): Int = 2
 
+fun String.printWith(s: String) = println("$this $s")
+
 object Test {
 
     fun String.count2(): Int {
@@ -75,6 +77,8 @@ object Test {
         ext.dummy()
         ext.dummy(1.0)
         ext.usingThis()
+
+        "Hello".printWith("World")
     }
 
     fun coucou() {

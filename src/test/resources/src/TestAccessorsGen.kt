@@ -27,6 +27,11 @@ class MyClassWithAccessors {
         set(value) {
             field = value + "_set"
         }
+
+    var customSet: String = "customSet"
+        set(myVal) {
+            field = myVal + "_set"
+        }
 }
 
 object TestAccessorsGen {
@@ -43,6 +48,9 @@ object TestAccessorsGen {
         println(a.tmp)
         a.tmp = "tmp2"
         println(a.tmp)
+        println(a.customSet)
+        a.customSet = "not_using_default_parameter_name"
+        println(a.customSet)
 
     }
 }
