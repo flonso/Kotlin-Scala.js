@@ -1,5 +1,12 @@
 interface MyThisInterface {
     var b: String
+
+    val defaultAccessors: String
+        get() {
+            println(this.b)
+            return "I accessed this.b !"
+        }
+
     fun myThisInterfaceFun() {
         this.b = "I was called using this from an interface default implementation"
         println(this.b)
@@ -41,5 +48,6 @@ object TestThisKeyword {
 
         a.myExtensionWithThis(3)
         a.myThisInterfaceFun()
+        println(a.defaultAccessors)
     }
 }

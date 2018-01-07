@@ -50,7 +50,9 @@ object GenClassUtils {
       * @return A set of String of the overridden methods signatures
       */
     def getOverriddenDeclarations: Set[String] = {
-      clsOrObj.getDeclarations.asScala
+      val fromPrimaryConstructor = clsOrObj.getPrimaryConstructorParameters.asScala.filter(_.hasModifier(KtTokens.OVERRIDE_KEYWORD))
+
+      (clsOrObj.getDeclarations.asScala ++ fromPrimaryConstructor)
         .filter(x => x.hasModifier(KtTokens.OVERRIDE_KEYWORD))
         .map {
           case nf: KtNamedFunction =>
@@ -58,6 +60,9 @@ object GenClassUtils {
 
           case p: KtProperty =>
             BindingUtils.getPropertyDescriptor(c.bindingContext(), p).getName.asString()
+
+          case p: KtParameter =>
+            BindingUtils.getPropertyDescriptorForConstructorParameter(c.bindingContext(), p).getName.asString()
 
         }
         .toSet
@@ -75,6 +80,7 @@ object GenClassUtils {
       clsOrObj.getInterfaceInheritedDeclarations.collect {
         case p: KtProperty =>
           val pDesc = BindingUtils.getPropertyDescriptor(c.bindingContext(), p)
+
           if (overriddenDeclarations.contains(pDesc.getName.asString()))
             Nil
           else
@@ -131,30 +137,18 @@ object GenClassUtils {
     def getInterfaceBridges: List[MethodDef] = {
       clsOrObj.getMissingInterfaceDeclarations.collect {
         case nf: KtNamedFunction if !desc.isInterface =>
-          val methodDef = GenDeclaration(nf).tree match {
+          val bridge = _toBridge(GenDeclaration(nf).tree, nf)
 
-            case md @ MethodDef(_, name, argsParamDef, resultType, _) =>
-              val funDesc = BindingUtils.getFunctionDescriptor(c.bindingContext(), nf)
-              val clsDesc = DescriptorUtils.getContainingClass(funDesc)
+          Seq(bridge)
+        // Generate bridges for accessors
+        case p: KtProperty if !desc.isInterface =>
+          val bridges = GenProperty(p)
+            .withGetterAndSetter
+            .filter(_.isInstanceOf[MethodDef])
+            .map(m => _toBridge(m, p))
 
-              val newName = Ident(name.encodedName.replaceFirst("__" + clsDesc.toJsClassName, ""))
-
-              val newBody = {
-                val methodIdent = funDesc.toJsMethodDeclIdent
-                val defaultImplCls = clsDesc.toJsDefaultImplType
-                val cls = clsDesc.toJsClassType
-                val self = genThisFromContext(cls)
-                val args = self :: argsParamDef.tail.map(_.ref)
-                ApplyStatic(defaultImplCls, methodIdent, args)(md.resultType)
-              }
-
-              MethodDef(static = false, newName, argsParamDef.tail, resultType, Option(newBody))(
-                OptimizerHints.empty,
-                None)
-          }
-
-          methodDef
-      }
+          bridges
+      }.flatten
     }
 
     /**
@@ -414,5 +408,37 @@ object GenClassUtils {
           )
         }
     }
+
+    /**
+      * Transforms a MethodDef of an interface into a MethodDef calling the default implementation
+      * of the interface.
+      * @param m The MethodDef to be transformed to a bridge
+      * @param e The KtProperty or KtNamedFunction element, the bridge should be generated from
+      * @return The transformed MethodDef
+      */
+    private def _toBridge(m: MemberDef, e: KtElement): MethodDef =  m match {
+      case md @ MethodDef(_, name, argsParamDef, resultType, _) =>
+        val elemDesc = e match {
+          case p: KtProperty => BindingUtils.getPropertyDescriptor(c.bindingContext(), p)
+          case nf: KtNamedFunction => BindingUtils.getFunctionDescriptor(c.bindingContext(), nf)
+        }
+        val clsDesc = DescriptorUtils.getContainingClass(elemDesc)
+
+        val newName = Ident(name.encodedName.replaceFirst("__" + clsDesc.toJsClassName, ""))
+
+        val newBody = {
+          val methodIdent = elemDesc.toJsMethodDeclIdent
+          val defaultImplCls = clsDesc.toJsDefaultImplType
+          val cls = clsDesc.toJsClassType
+          val self = genThisFromContext(cls)
+          val args = self :: argsParamDef.tail.map(_.ref)
+          ApplyStatic(defaultImplCls, methodIdent, args)(md.resultType)
+        }
+
+        MethodDef(static = false, newName, argsParamDef.tail, resultType, Option(newBody))(
+          OptimizerHints.empty,
+          None)
+    }
+
   }
 }

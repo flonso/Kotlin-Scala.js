@@ -166,6 +166,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |Calling myDef() (no this) from extension function : myDef
         |Using this in an extension : this.number = 3
         |I was called using this from an interface default implementation
+        |I was called using this from an interface default implementation
+        |I accessed this.b !
       """.stripMargin
     assertExecResult(res, Seq("TestThisKeyword.kt"), mainClass = "TestThisKeyword.main")
   }
