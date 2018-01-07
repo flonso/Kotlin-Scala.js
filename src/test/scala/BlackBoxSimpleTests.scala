@@ -52,6 +52,10 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |var a from super = 0
         |var a from child = 1
         |var b from super = 5
+        |First initializer block that prints Toto
+        |Second initializer block that prints 4
+        |First property: Toto
+        |Second property: 4
       """.stripMargin
 
     assertExecResult(result, Seq("classes/"), mainClass = "TestClasses.main")
@@ -152,25 +156,17 @@ class BlackBoxSimpleTests extends BlackBoxTest {
 
   // TODO: Complete this test
   test("TestThisKeyword.kt") {
-    class MyClass(val num: Int) {
-      def myDef: Unit = {
-        println("myDef")
-      }
-
-      def equals(b: MyClass): Boolean = {
-        this.myDef
-        this.num == b.num
-      }
-    }
-
-    val res = consoleToString {
-      val a = new MyClass(1)
-      val b = new MyClass(1)
-      val c = new MyClass(2)
-
-      printlnJSFormat(a.equals(b))
-      printlnJSFormat(a.equals(c))
-    }
+    val res =
+      """
+        |myDef
+        |true
+        |myDef
+        |false
+        |Calling this.myDef() from extension function : myDef
+        |Calling myDef() (no this) from extension function : myDef
+        |Using this in an extension : this.number = 3
+        |I was called using this from an interface default implementation
+      """.stripMargin
     assertExecResult(res, Seq("TestThisKeyword.kt"), mainClass = "TestThisKeyword.main")
   }
 
@@ -199,6 +195,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |Base with p = 4 is not a Long
         |Base with p = 4 is Base class
         |Base with p = 4 is not Derived class
+        |Doing something !
+        |hello world is a String
       """.stripMargin
 
     assertExecResult(expectedResult, Seq("TestIsOperator.kt"), mainClass = "TestIsOperator.main")

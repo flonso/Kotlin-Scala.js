@@ -61,7 +61,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     assert(expected == content)
   }
 
-  protected def compileAndCheckIr(sources: Seq[String], mainPath: String = "", outFile: String = "out.js") = {
+  protected def compileAndCheckIr(sources: Seq[String], mainPath: String = "", outFile: String = "out.js", optimize: Boolean = true) = {
     val files = sources.map(s => s"$ROOT_SOURCE/$s")
     val options = Seq("-Xallow-kotlin-package", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME)
 
@@ -79,7 +79,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
       ROOT_OUT, ROOT_LIB_OUT,
       "-o", s"$ROOT_OUT/$outFile",
       "-c",
-      "-u"
+      if (optimize) "-u" else "-n"
     )
     Scalajsld.main((linkerArgs ++ mainMethod).toArray)
   }

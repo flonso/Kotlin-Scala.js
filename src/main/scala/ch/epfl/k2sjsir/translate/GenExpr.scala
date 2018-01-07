@@ -223,7 +223,11 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         val tpe = c.bindingContext().getType(k)
         val desc = getClassDescriptorForType(tpe)
 
-        genThisFromContext(tpe.toJsType, desc)
+        val funDesc = BindingContextUtils.getEnclosingFunctionDescriptor(c.bindingContext(), k)
+        if (funDesc != null && DescriptorUtils.isExtension(funDesc))
+          VarRef(Ident("$this"))(tpe.toJsType)
+        else
+          genThisFromContext(tpe.toJsType, desc)
 
       case k: KtSuperExpression =>
         // This is a hack, super calls must be translated to ApplyStatically but

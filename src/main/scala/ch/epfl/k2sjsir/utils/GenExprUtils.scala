@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.descriptors.{ClassDescriptor, PropertyDescriptor}
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi._
+import org.jetbrains.kotlin.resolve.{BindingContextUtils, DescriptorUtils}
 import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types.{ArrayType, ClassType, Type}

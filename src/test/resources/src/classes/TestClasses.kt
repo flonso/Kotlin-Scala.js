@@ -49,11 +49,18 @@ fun myDataClassTest() {
     //r.test()
 }
 
+fun myMultitpleInit() {
+    val i = InitOrderDemo("Toto")
+    println(i.firstProperty)
+    println(i.secondProperty)
+}
+
 object TestClasses {
     fun main(args: Array<String>) {
         myEnumTests()
         myInheritanceTest()
         myClassWithSuperTest()
         //myDataClassTest()
+        myMultitpleInit()
     }
 }

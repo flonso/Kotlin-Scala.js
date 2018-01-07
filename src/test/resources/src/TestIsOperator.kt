@@ -7,6 +7,8 @@ open class Base (val p: Int) {
 
 class Derived(p: Int) : Base(p) {
 
+    fun doSomething(): Unit = println("Doing something !")
+
     override fun toString(): String {
         return "Derived with p = $p"
     }
@@ -25,6 +27,9 @@ object TestIsOperator {
         check(myLong)
         check(myDerived)
         check(myBase)
+
+        useWithoutSmartCast(myDerived)
+        useWithoutSmartCast("hello world")
     }
 }
 
@@ -42,4 +47,14 @@ fun check(a: Any) {
     if (a is Base) println("$a is Base class")
     if (a is Derived) println("$a is Derived class")
     if (a !is Derived) println("$a is not Derived class")
+}
+
+fun useWithoutSmartCast(a: Any) {
+    if (a is Derived) {
+        val a2 = a as Derived
+        a2.doSomething()
+    } else if (a is String) {
+        val a3 = a as String
+        println(a3 + " is a String")
+    }
 }
