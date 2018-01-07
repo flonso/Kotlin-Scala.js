@@ -4,7 +4,11 @@ open class MyParentWithSuper {
     open fun dummy(): Unit = println("dummy from parent")
 }
 
-class MyClassWithSuper: MyParentWithSuper() {
+open class MyOtherParentWithSuper {
+    open fun f() = println("A")
+}
+
+open class MyClassWithSuper: MyParentWithSuper() {
 
     override val a: Int = 1
     override var b: Int = 0
@@ -23,9 +27,21 @@ class MyClassWithSuper: MyParentWithSuper() {
         super.b = 5
         println("var b from super = ${super.b}")
     }
+
     fun test() {
         dummy()
         printA()
         useSuperB()
+    }
+}
+
+interface MyInterfaceWithSuper {
+    fun f() = println("B")
+}
+
+class MyClassWithTwoParents : MyOtherParentWithSuper(), MyInterfaceWithSuper {
+    override fun f() {
+        super<MyOtherParentWithSuper>.f()
+        super<MyInterfaceWithSuper>.f()
     }
 }

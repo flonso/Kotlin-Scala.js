@@ -230,13 +230,12 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
           genThisFromContext(tpe.toJsType, desc)
 
       case k: KtSuperExpression =>
-        // This is a hack, super calls must be translated to ApplyStatically but
+        // Super calls must be translated to ApplyStatically but
         // here we know neither the method name nor the arguments.
-        // Super calls are therefore detected where Apply are generated
+        // Super calls are therefore detected where Apply nodes are generated (GenCall)
         val tpe = c.bindingContext().getType(k)
-        val desc = DescriptorUtils.getClassDescriptorForType(tpe)
 
-        genThisFromContext(tpe.toJsType, desc)
+        genThisFromContext(tpe.toJsType)
 
       case k: KtDestructuringDeclaration =>
         for {

@@ -52,6 +52,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |var a from super = 0
         |var a from child = 1
         |var b from super = 5
+        |A
+        |B
         |First initializer block that prints Toto
         |Second initializer block that prints 4
         |First property: Toto

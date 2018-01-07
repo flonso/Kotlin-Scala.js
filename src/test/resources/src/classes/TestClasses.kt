@@ -42,6 +42,8 @@ fun myInheritanceTest() {
 fun myClassWithSuperTest() {
     val c = MyClassWithSuper()
     c.test()
+    val c2 = MyClassWithTwoParents()
+    c2.f()
 }
 
 fun myDataClassTest() {

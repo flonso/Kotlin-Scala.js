@@ -1,6 +1,6 @@
 package ch.epfl.k2sjsir.translate
 
-import ch.epfl.k2sjsir.utils.NameEncoder
+import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
 import ch.epfl.k2sjsir.utils.Utils._
 import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDescriptor, ClassDescriptor, SimpleFunctionDescriptor}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
@@ -103,11 +103,26 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                   else if (isLambdaCall && isDirectInvokeCall)
                     castJsFunctionApply(JSFunctionApply(receiver, args), desc)
                   else if (isSuperCall) {
+                    val superTpe = c.bindingContext().getType(rcv.get)
+                    val superDesc = DescriptorUtils.getClassDescriptorForType(superTpe)
+                    val superArgs = rcv
+                      .filter(_ => superDesc.isInterface)
+                      .map(_ => receiver)
+                      .toList
+
                     val clsTpe = receiver.tpe match {
-                      case c:ClassType => c
+                      case c:ClassType =>
+                        if (superDesc.isInterface)
+                          ClassType(superDesc.toJsDefaultImplName)
+                        else
+                          c
                       case t => throw new Exception(s"Got a super call with type $t")
                     }
-                    ApplyStatically(receiver, clsTpe, name, args)(rtpe)
+
+                    if (superDesc.isInterface)
+                      ApplyStatic(clsTpe, desc.toJsMethodDeclIdent, superArgs ++ args)(rtpe)
+                    else
+                      ApplyStatically(receiver, clsTpe, name, args)(rtpe)
                   }
                   else
                     Apply(receiver, name, args)(rtpe)
