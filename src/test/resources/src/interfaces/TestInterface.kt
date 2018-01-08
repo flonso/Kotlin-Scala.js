@@ -19,5 +19,11 @@ object TestInterface {
         println(myClass.abstractMethod(2, "is a great number"))
         myClass.doSomething()
 
+        myClass.noOverride = "This value will be ignored"
+        println(myClass.noOverride)
+
+        myClass.withOverride = "This value overrides the one from the interface"
+        println(myClass.withOverride)
+
     }
 }

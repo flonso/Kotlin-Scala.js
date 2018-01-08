@@ -76,6 +76,8 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |(a = 0 b = Hello World c = Hey there. dog = Dog(Lassie))
         |10 is a great number
         |It's something !
+        |I'm a var but I cannot be set without an override !
+        |This value overrides the one from the interface
       """.stripMargin
     assertExecResult(result, Seq("interfaces/"), mainClass = "TestInterface.main")
   }
@@ -444,6 +446,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |C.baz
         |this is an extension function
         |this is another extension function
+        |Hello World
       """.stripMargin, Seq("TestClassExtension.kt"), mainClass = "TestClassExtension.main")
   }
 

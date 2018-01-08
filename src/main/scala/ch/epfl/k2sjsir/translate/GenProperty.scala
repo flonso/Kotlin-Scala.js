@@ -32,8 +32,12 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
   }
 
   def withGetterAndSetter: List[MemberDef] = {
+    val cd = desc.getContainingDeclaration match {
+      case c: ClassDescriptor => c
+      case _ => null
+    }
     val t = {
-      if (d.isVar || d.hasInitializer)
+      if ((d.isVar || d.hasInitializer) && cd != null && !cd.isInterface)
         List(tree)
       else
         Nil
@@ -97,12 +101,9 @@ object GenProperty {
     assert(propGetterDesc != null)
 
     val rtpe = desc.getReturnType.toJsType
-    val dispatchReceiver = Option(desc.getDispatchReceiverParameter)
-    val tpe = dispatchReceiver.fold(null: KotlinType)(dr => dr.getType)
-    val cd = dispatchReceiver.fold(null: ClassDescriptor)(_ => DescriptorUtils.getClassDescriptorForType(tpe))
 
     val methodIdent = propGetterDesc.toJsMethodDeclIdent
-    val static = cd != null && isInterface(cd)
+    val static = isStaticAccessor(desc)
 
     val body = {
       if (!isAbstract) {
@@ -117,12 +118,7 @@ object GenProperty {
       }
     }
 
-    val args = {
-      if (cd != null && isInterface(cd))
-        List(ParamDef(Ident("$this"), cd.toJsClassType, false, false))
-      else
-        Nil
-    }
+    val args = getInterfaceReceiverParameter(desc).toList
 
 
     MethodDef(static, methodIdent, args, rtpe, body)(OptimizerHints.empty, None)
@@ -142,11 +138,11 @@ object GenProperty {
     assert(propSetterDesc != null)
 
     val rtpe = NoType // Kotlin setters always return Unit
-    val isStatic = false
+    val isStatic = isStaticAccessor(desc)
     val propTpe = desc.getType.toJsType
     val methodIdent = propSetterDesc.toJsMethodDeclIdent
     val setterIdent = propSetterDesc.getValueParameters.get(0).toJsIdent
-    val params = List(ParamDef(setterIdent, desc.getType.toJsType, mutable = false, rest = false))
+    val params = getInterfaceReceiverParameter(desc).toList ++ List(ParamDef(setterIdent, desc.getType.toJsType, mutable = false, rest = false))
 
     val body = {
       if (!isAbstract) {
@@ -201,6 +197,25 @@ object GenProperty {
 
     val rcv = genThisFromContext(clsTpe, desc)
     Select(rcv, ident)(slctTpe)
+  }
 
+  private def isStaticAccessor(propDesc: PropertyDescriptor): Boolean = {
+    val dispatchReceiver = Option(propDesc.getDispatchReceiverParameter)
+    val tpe = dispatchReceiver.fold(null: KotlinType)(dr => dr.getType)
+    val cd = dispatchReceiver.fold(null: ClassDescriptor)(_ => DescriptorUtils.getClassDescriptorForType(tpe))
+
+    cd != null && cd.isInterface
+  }
+
+  private def getInterfaceReceiverParameter(desc: PropertyDescriptor)(implicit pos: Position): Option[ParamDef] = {
+
+    val dispatchReceiver = Option(desc.getDispatchReceiverParameter)
+    val tpe = dispatchReceiver.fold(null: KotlinType)(dr => dr.getType)
+    val cd = dispatchReceiver.fold(null: ClassDescriptor)(_ => DescriptorUtils.getClassDescriptorForType(tpe))
+
+    if (cd != null && isInterface(cd))
+      Option(ParamDef(Ident("$this"), cd.toJsClassType, false, false))
+    else
+      None
   }
 }

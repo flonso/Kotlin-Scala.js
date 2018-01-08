@@ -9,8 +9,8 @@ import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{ClassKind, Definitions, Position, Types}
 import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
-import org.jetbrains.kotlin.psi.{KtFile, KtProperty}
-import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.psi.{KtExpression, KtFile, KtProperty}
+import org.jetbrains.kotlin.resolve.{BindingContext, DescriptorUtils}
 import org.jetbrains.kotlin.resolve.`lazy`.descriptors.{LazyClassDescriptor, LazyPackageDescriptor}
 import org.scalajs.core.ir
 
@@ -151,7 +151,8 @@ object Utils {
   }
 
   implicit class PropertyAccessor(d: PropertyDescriptor)(implicit pos: Position) {
-    def getterIdent(): Ident = NameEncoder.encodeMethodIdent(d)
+    def getterIdent(): Ident = NameEncoder.encodeMethodIdent(d.getGetter)
+    def setterIdent(): Ident = NameEncoder.encodeMethodIdent(d.getSetter)
   }
 
   implicit class TopLevelHelper(f: KtFile) {

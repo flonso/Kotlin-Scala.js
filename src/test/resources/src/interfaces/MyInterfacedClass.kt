@@ -3,6 +3,7 @@ class MyInterfacedClass(override var c: String) : MyInterface  {
     override var dog: Dog = Dog("Rex")
     override val a: Int = 0
     override val b: String = "Hello World"
+    override var withOverride: String = super.withOverride
 
     fun tmp(d: Dog) {
         d.bark()

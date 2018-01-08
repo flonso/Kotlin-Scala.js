@@ -3,6 +3,13 @@ interface MyInterface : MySuperInterface, DummyInterface {
         get() = 10
     val b: String
     val c: String
+    var noOverride: String
+        get() = "I'm a var but I cannot be set without an override !"
+        set(value){}
+
+    var withOverride: String
+        get() = "I'm a var but I cannot be set without an override !"
+        set(value){}
 
     fun abstractMethod(arg1: Int, arg2: String): String
 

@@ -3,7 +3,7 @@ package ch.epfl.k2sjsir.utils
 import ch.epfl.k2sjsir.lower.SJSIRLower
 import ch.epfl.k2sjsir.translate.{GenDeclaration, GenEnumEntry, GenProperty}
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.{ClassDescriptor, PropertyDescriptor}
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils.{getFunctionDescriptor, getPropertyDescriptor}
@@ -417,9 +417,14 @@ object GenClassUtils {
       * @return The transformed MethodDef
       */
     private def _toBridge(m: MemberDef, e: KtElement): MethodDef =  m match {
-      case md @ MethodDef(_, name, argsParamDef, resultType, _) =>
+      case md @ MethodDef(_, name: Ident, argsParamDef, resultType, _) =>
         val elemDesc = e match {
-          case p: KtProperty => BindingUtils.getPropertyDescriptor(c.bindingContext(), p)
+          case p: KtProperty =>
+            val pDesc = BindingUtils.getPropertyDescriptor(c.bindingContext(), p)
+            if (name.originalName.toString.contains("get"))
+              pDesc.getGetter
+            else
+              pDesc.getSetter
           case nf: KtNamedFunction => BindingUtils.getFunctionDescriptor(c.bindingContext(), nf)
         }
         val clsDesc = DescriptorUtils.getContainingClass(elemDesc)

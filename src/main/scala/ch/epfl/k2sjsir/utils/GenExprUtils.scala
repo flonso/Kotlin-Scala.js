@@ -67,12 +67,7 @@ object GenExprUtils {
 
               receiver match {
                 case _: KtSuperExpression =>
-                  val clsTpe = receiverExpr.tpe match {
-                    case c: ClassType => c
-                    case t => throw new Exception(s"Super expression with type $t")
-                  }
-
-                  ApplyStatically(receiverExpr, clsTpe, getter, args )(tpe)
+                  GenCall.genSuperCallFromContext(m, receiver, getter, args)
                 case _ if isExternal =>
                   JSBracketSelect(receiverExpr, StringLiteral(m.getName.asString()))
                 case _ =>

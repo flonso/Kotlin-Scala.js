@@ -2,15 +2,16 @@ package ch.epfl.k2sjsir.translate
 
 import ch.epfl.k2sjsir.utils.{NameEncoder, Utils}
 import ch.epfl.k2sjsir.utils.Utils._
-import org.jetbrains.kotlin.descriptors.{CallableDescriptor, ClassConstructorDescriptor, ClassDescriptor, SimpleFunctionDescriptor}
+import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
-import org.jetbrains.kotlin.psi.{KtCallExpression, KtExpression, KtFile, KtSuperExpression}
+import org.jetbrains.kotlin.psi._
 import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils}
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver, ReceiverValue}
 import org.jetbrains.kotlin.types.TypeUtils
+import org.scalajs.core.ir.Position
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types._
 
@@ -23,6 +24,15 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
   private lazy val rtpe = desc.getOriginal.getReturnType.toJsType
   private val name = desc.getName.asString()
   private val args = genArgs().toList
+
+  /*
+   * Calls to the invoke() function can either be implicit (class.mylambda(args))
+   * or explicit (Object::funReference).invoke(args)).
+   * The descriptor doesn't allow to differentiate such calls directly.
+   * TODO: Replace the isDirectInvokeCall with a retrieval of the property the call is applied to
+   */
+  private val isLambdaCall = name == "invoke"
+  private val isDirectInvokeCall = d.getText.matches("^invoke[(].*[)]$")
 
   override def tree: Tree = withReceiver(None)
 
@@ -37,7 +47,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
           }
         }
 
-        // TODO: Remove this first if when using the stdlib
+        // TODO: Remove this first 'if' when using the stdlib
         if (GenArray.isNewKtArray(desc))
           GenArray(d, args).tree
         else if(!cc.getContainingDeclaration.isExternal)
@@ -64,8 +74,6 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
           if (rcv.nonEmpty) {
             val receiver = GenExpr(rcv.get).tree
 
-            val isLambdaCall = name == "invoke"
-            val isDirectInvokeCall = d.getText.matches("^invoke[(].*[)]$")
             val isArray = receiver.tpe.isInstanceOf[ArrayType]
             val isSuperCall = rcv.get.isInstanceOf[KtSuperExpression]
 
@@ -88,41 +96,31 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                 case _: LoadJSModule | _: JSNew =>
                   cast(JSBracketMethodApply(receiver, StringLiteral(name), args), desc.getReturnType)
                 case _ =>
-                  val name = if (desc.getName.toString == "invoke") NameEncoder.encodeApplyLambda(desc) else desc.toJsMethodIdent
+                  val name = {
+                    if (isLambdaCall) {
+                      if (isDirectInvokeCall)
+                        NameEncoder.encodeApplyLambda(desc)
+                      else {
+                        // TODO: This will occur only when we have a call of the form class.lambdainprop(args)
+                        // and should be replaced with a call to GenExpr with the expression corresponding to
+                        // lambdainprop. This can be done through the dispatch receiver of the resolved call
+                        val lambdaFuncName = """((.+)\(.*\))""".r.replaceAllIn(d.getText, "$2")
+                        Ident(s"${lambdaFuncName}__O")
+                      }
+                    }
+                    else desc.toJsMethodIdent
+                  }
 
+                  // If it's a DOT_QUALIFIED call (class.prop(args))
                   if (isLambdaCall && !isDirectInvokeCall) {
-                    val lambdaFuncName = """((.+)\(.*\))""".r.replaceAllIn(d.getText, "$2")
-                    val lambdaName = Ident(s"${lambdaFuncName}__O")
-
-                    // Cast -> AsInstanceOf is  and Unboxed... if primitive type
-                    // GenjsCode --> fromAny
-                    val funcApply = JSFunctionApply(Apply(receiver, lambdaName, Nil)(AnyType), args)
+                    val funcApply = JSFunctionApply(Apply(receiver, name, Nil)(AnyType), args)
 
                     castJsFunctionApply(funcApply, desc)
                   }
                   else if (isLambdaCall && isDirectInvokeCall)
                     castJsFunctionApply(JSFunctionApply(receiver, args), desc)
                   else if (isSuperCall) {
-                    val superTpe = c.bindingContext().getType(rcv.get)
-                    val superDesc = DescriptorUtils.getClassDescriptorForType(superTpe)
-                    val superArgs = rcv
-                      .filter(_ => superDesc.isInterface)
-                      .map(_ => receiver)
-                      .toList
-
-                    val clsTpe = receiver.tpe match {
-                      case c:ClassType =>
-                        if (superDesc.isInterface)
-                          ClassType(superDesc.toJsDefaultImplName)
-                        else
-                          c
-                      case t => throw new Exception(s"Got a super call with type $t")
-                    }
-
-                    if (superDesc.isInterface)
-                      ApplyStatic(clsTpe, desc.toJsMethodDeclIdent, superArgs ++ args)(rtpe)
-                    else
-                      ApplyStatically(receiver, clsTpe, name, args)(rtpe)
+                    GenCall.genSuperCallFromContext(desc, rcv.get, name, args)
                   }
                   else
                     Apply(receiver, name, args)(rtpe)
@@ -187,7 +185,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                   }
                 }
                 else {
-                  if (desc.getName.toString == "invoke")
+                  if (isLambdaCall)
                     castJsFunctionApply(JSFunctionApply(receiver, args), desc)
                   else
                     Apply(receiver, desc.toJsMethodIdent, args)(rtpe)
@@ -204,7 +202,6 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
 
   private def castJsFunctionApply(jsFuncApply: JSFunctionApply, desc: CallableDescriptor): Tree = {
     val rtpe = desc.getReturnType
-    cast(jsFuncApply, rtpe)
     cast(jsFuncApply, rtpe)
   }
 
@@ -291,5 +288,34 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
         None
       case _ => None
     }
+  }
+}
+
+object GenCall {
+
+  def genSuperCallFromContext(callDesc: CallableDescriptor, rcv: KtExpression, name: Ident, args: List[Tree])(implicit c: TranslationContext, pos: Position) = {
+    val receiver = GenExpr(rcv).tree
+    val rtpe = callDesc.getOriginal.getReturnType.toJsType
+
+    val superTpe = c.bindingContext().getType(rcv)
+    val superDesc = DescriptorUtils.getClassDescriptorForType(superTpe)
+    val superArgs = Option(rcv)
+      .filter(_ => superDesc.isInterface)
+      .map(_ => receiver)
+      .toList
+
+    val clsTpe = receiver.tpe match {
+      case c:ClassType =>
+        if (superDesc.isInterface)
+          ClassType(superDesc.toJsDefaultImplName)
+        else
+          c
+      case t => throw new Exception(s"Got a super call with type $t")
+    }
+
+    if (superDesc.isInterface)
+      ApplyStatic(clsTpe, callDesc.toJsMethodDeclIdent, superArgs ++ args)(rtpe)
+    else
+      ApplyStatically(receiver, clsTpe, name, args)(rtpe)
   }
 }
