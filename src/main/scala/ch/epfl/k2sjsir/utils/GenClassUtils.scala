@@ -339,7 +339,10 @@ object GenClassUtils {
         .filter(_prop)
         .collect {
           case p: KtProperty =>
-            GenProperty(p).withGetterAndSetter
+            if (desc.isInterface)
+              GenProperty(p).withAbstractGetterAndSetter
+            else
+              GenProperty(p).withGetterAndSetter
 
           case e: KtEnumEntry =>
             GenEnumEntry(e).withGetter
@@ -348,7 +351,9 @@ object GenClassUtils {
             Nil
 
           case declaration =>
-            List(GenDeclaration(declaration).tree)
+            val decl = if (desc.isInterface) GenDeclaration(declaration).withAbstractBodies else GenDeclaration(declaration).tree
+
+            List(decl)
 
         }
         .flatten

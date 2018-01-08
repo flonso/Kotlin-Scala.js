@@ -103,7 +103,7 @@ object GenProperty {
     val rtpe = desc.getReturnType.toJsType
 
     val methodIdent = propGetterDesc.toJsMethodDeclIdent
-    val static = isStaticAccessor(desc)
+    val static = isStaticAccessor(desc) && !isAbstract
 
     val body = {
       if (!isAbstract) {
@@ -138,7 +138,7 @@ object GenProperty {
     assert(propSetterDesc != null)
 
     val rtpe = NoType // Kotlin setters always return Unit
-    val isStatic = isStaticAccessor(desc)
+    val isStatic = isStaticAccessor(desc) && !isAbstract
     val propTpe = desc.getType.toJsType
     val methodIdent = propSetterDesc.toJsMethodDeclIdent
     val setterIdent = propSetterDesc.getValueParameters.get(0).toJsIdent
