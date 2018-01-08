@@ -67,6 +67,7 @@ class BlackBoxSimpleTests extends BlackBoxTest {
     val result =
       """(a = 0 b = Hello World c = Hello World dog = Dog(Rex))
         |(a = 0 b = Hello World c = Some value dog = Dog(Rex))
+        |I bought a dog ! His name is Rex.
         |Barking !
         |You pet your dog !
         |Barking !

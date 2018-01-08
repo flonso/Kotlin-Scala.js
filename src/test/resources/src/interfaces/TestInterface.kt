@@ -7,6 +7,8 @@ object TestInterface {
         myClass.changeCToSomeValue()
         println(myClass)
 
+        myClass.buyADog()
+
         myClass.dog.bark()
         myClass.petYourDog()
         myClass.dummyFun()
