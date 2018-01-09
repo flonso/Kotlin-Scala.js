@@ -30,11 +30,13 @@ case class GenUnary(d: KtUnaryExpression)(implicit val c: TranslationContext) ex
         }
 
       case KtTokens.EXCLEXCL =>
-        If(
-          Utils.genNotNullCond(lhs),
-          lhs,
-          Throw(New(ClassType("jl_NullPointerException"), Ident("init___"), Nil))
-        )(lhs.tpe)
+        val freshVar = VarDef(Ident(Utils.getFreshName()), lhs.tpe, mutable = false, lhs)
+
+        Block(
+          freshVar,
+          If(Utils.genNotNullCond(freshVar.ref), freshVar.ref,
+            Throw(New(ClassType("jl_NullPointerException"), Ident("init___"), Nil)))(lhs.tpe)
+        )
 
       case operation =>
         notImplemented(s"default case for operation $operation")
