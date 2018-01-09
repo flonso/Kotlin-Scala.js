@@ -47,6 +47,10 @@ object GenExprUtils {
           case _ => BindingUtils.getTypeForExpression(c.bindingContext(), kn).toJsType
         }
 
+
+        val freshVar = VarDef(Ident(Utils.getFreshName()), receiverExpr.tpe, mutable = false, receiverExpr)
+        val actualReceiverExpr = if (isSafe) freshVar.ref else receiverExpr
+
         val ao = if(isArray) arrayOps(receiverExpr, tpe, kn.getReferencedName, List()) else None
         val dotExpr = ao.getOrElse {
           selectorDesc match {
@@ -69,16 +73,16 @@ object GenExprUtils {
                 case _: KtSuperExpression =>
                   GenCall.genSuperCallFromContext(m, receiver, getter, args)
                 case _ if isExternal =>
-                  JSBracketSelect(receiverExpr, StringLiteral(m.getName.asString()))
+                  JSBracketSelect(actualReceiverExpr, StringLiteral(m.getName.asString()))
                 case _ =>
-                  cast(Apply(receiverExpr, getter, args)(originalTpe.toJsType), m.getType())
+                  cast(Apply(actualReceiverExpr, getter, args)(originalTpe.toJsType), m.getType())
               }
 
             case cls: ClassDescriptor =>
               if (cls.isEnumEntry) {
                 val parent = cls.getContainingDeclaration.asInstanceOf[ClassDescriptor]
 
-                Apply(receiverExpr, Ident(cls.getName().asString() + "__" + parent.toJsClassType.className), Nil)(tpe)
+                Apply(actualReceiverExpr, Ident(cls.getName().asString() + "__" + parent.toJsClassType.className), Nil)(tpe)
               } else {
                 GenExpr(selector).tree
               }
@@ -88,11 +92,12 @@ object GenExprUtils {
         }
 
         if (isSafe) {
-          val cond = genNotNullCond(receiverExpr)
+
+          val cond = genNotNullCond(freshVar.ref)
           val thenp = dotExpr
           val elsep = Null()
 
-          If(cond, thenp, elsep)(tpe)
+          Block(List(freshVar, If(cond, thenp, elsep)(tpe)))
         } else {
           dotExpr
         }

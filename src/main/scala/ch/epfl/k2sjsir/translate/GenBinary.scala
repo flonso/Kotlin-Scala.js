@@ -158,11 +158,13 @@ case class GenBinary(d: KtBinaryExpression)(implicit val c: TranslationContext) 
     val lhs = GenExpr(left).tree
     val rhs = GenExpr(right).tree
 
-    val cond = genNotNullCond(lhs)
+    val freshVar = VarDef(Ident(Utils.getFreshName()), lhs.tpe, mutable = false, lhs)
+
+    val cond = genNotNullCond(freshVar.ref)
 
     // lhs is always nullable (because of elvis), therefore we need to cast it
     // it's safe to do so because it will only be cast if it's non null
-    If(cond, cast(lhs, exprTpe), rhs)(exprTpe.toJsType)
+    Block(freshVar, If(cond, cast(freshVar.ref, exprTpe), rhs)(exprTpe.toJsType))
   }
 
   private def isNotOverloadable(op: KtToken): Boolean =
