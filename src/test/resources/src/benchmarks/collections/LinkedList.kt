@@ -42,9 +42,9 @@ class LinkedListIterator<E>(val head: Node<E>?) {
 
     fun next(): E {
         if (hasNext()) {
-            val ret = currentNode?.value
-            currentNode = currentNode?.next
-            return ret!!
+            val ret = currentNode!!.value
+            currentNode = currentNode!!.next
+            return ret
         } else {
             throw Exception("Reached end of iterator")
         }
@@ -53,7 +53,7 @@ class LinkedListIterator<E>(val head: Node<E>?) {
 
 class LinkedList<E>(): MyMutableList<E> {
     var head: Node<E>? = null
-    var elements = arrayOfNulls<Node<E>>(0)
+    var last: Node<E>? = null
 
     override val size: Int
         get() {
@@ -67,6 +67,7 @@ class LinkedList<E>(): MyMutableList<E> {
 
     constructor(element: E): this() {
         head = Node(element, null)
+        last = head
     }
 
     constructor(values: Array<E>): this() {
@@ -77,66 +78,126 @@ class LinkedList<E>(): MyMutableList<E> {
 
     override fun isEmpty(): Boolean = head == null
 
-    override fun contains(element: E): Boolean = _contains(element, head)
+    override fun contains(element: E): Boolean = indexOf(element) >= 0
 
     override fun add(element: E): Boolean {
         val newNode = Node(element, null)
 
-        if (head == null) {
-            head = newNode
-        } else {
-            var lastNode = head
-            while (lastNode!!.next != null) {
-                lastNode = lastNode.next
-            }
+        if (last != null) last!!.next = newNode
+        else head = newNode
 
-            lastNode.next = newNode
-        }
+        last = newNode
+
+        return true
+    }
+
+    fun addFirst(element: E): Boolean {
+        val newNode = Node(element, head)
+        head = newNode
+
+        if (last == null) last = newNode
 
         return true
     }
 
     override fun remove(element: E): Boolean {
-        if (!contains(element)) return false
+        var node = head
+        var prev: Node<E>? = null
 
-        val index = indexOf(element)
+        while(node != null) {
+            val next = node.next
+            if (node.value == element) {
+                if (prev == null)
+                    head = next
+                else
+                    prev.next = next
 
-        if (index == 0) {
-            if (size == 1)
-                head = null
-            else
-                head = head!!.next
+                if (next == null)
+                    last = prev
+
+                return true
+            }
+            prev = node
+            node = next
         }
-        else {
-            val nodeBefore = _get(index - 1)
-            val node = nodeBefore.next!!
 
-            nodeBefore.next = node.next
-        }
-
-        return true
+        return false
     }
 
-    override fun removeAt(index: Int): E {
-        val node = _get(index)
-        remove(node.value)
+    fun removeFirst(): E {
+        val node = head!!
+        head = node.next
+
+        if (head == null) last = null
 
         return node.value
     }
 
-    override fun get(index: Int): E {
-        if (index >= size) throw Exception("Undefined index")
-        
-        return _get(index).value
+    override fun removeAt(index: Int): E {
+        var node = head
+        var prev: Node<E>? = null
+        var i = 0
+        while(node != null) {
+            val next = node.next
+
+            if (i == index) {
+                if (prev == null)
+                    head = next
+                else
+                    prev.next = next
+
+                if (next == null)
+                    last = prev
+
+                return node.value
+            }
+
+            prev = node
+            node = next
+            i += 1
+        }
+
+        throw Exception("Index out of bounds")
     }
 
-    override fun indexOf(element: E): Int = _indexOf(element, head)
+    override fun get(index: Int): E {
+        var node: Node<E>? = head
+        var i = 0
+
+        while (node != null) {
+            if (index == i) {
+                return node.value
+            }
+
+            node = node.next
+            i += 1
+        }
+
+        throw Exception("Index out of bounds")
+    }
+
+    override fun indexOf(element: E): Int {
+        var node = head
+        var index = 0
+        while (node != null) {
+            if (node.value == element)
+                return index
+
+            index += 1
+            node = node.next
+        }
+
+        return -1
+    }
 
     override fun <F> map(p: (E) -> F): LinkedList<F> {
         val newList = LinkedList<F>()
-        for (i in 0 until size) {
-            val e = get(i)
-            newList.add(p(e))
+
+        var node = head
+        while (node != null) {
+            newList.add(p(node.value))
+
+            node = node.next
         }
 
         return newList
@@ -144,12 +205,17 @@ class LinkedList<E>(): MyMutableList<E> {
 
     override fun joinToString(separator: String): String {
         var ret = ""
-        for (i in 0 until size) {
-            val e = get(i)
-            ret += e
-            if (i != lastIndex){
-                ret += separator
-            }
+
+        var node = head
+        var first = true
+        while (node != null) {
+            if (first) first = false
+            else ret += separator
+
+            ret += node.value
+
+
+            node = node.next
         }
 
         return ret
@@ -167,39 +233,6 @@ class LinkedList<E>(): MyMutableList<E> {
             currentNode = currentNode.next
         }
         return l;
-    }
-
-    private fun _contains(element: E, node: Node<E>?): Boolean {
-        return if (node == null) false
-        else {
-            if (node.value == element) true
-            else _contains(element, node.next)
-        }
-    }
-
-    private fun _indexOf(element: E, node: Node<E>?): Int = _indexOf(element, node, 0)
-
-    private fun _indexOf(element: E, node: Node<E>?, index: Int): Int {
-        if (node == null) return -1
-        else {
-            if (node.value == element) return index
-            else return _indexOf(element, node.next, index + 1)
-        }
-    }
-
-    private fun _get(index: Int): Node<E> {
-        if (isEmpty() || index >= size) throw Exception("Undefined index")
-
-        var node: Node<E> = head!!
-
-        for (i in 0 until size) {
-            if (index == i)
-                return node
-            else if (node.next != null)
-                node = node.next!!
-        }
-
-        throw Exception("Couldn't get desired index $index")
     }
 
     override fun toString(): String {

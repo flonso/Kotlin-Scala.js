@@ -4,12 +4,11 @@ class Stack<T> {
     private val stack = LinkedList<T>()
 
     fun pop(): T {
-        val last = stack.lastIndex
-        return stack.removeAt(last)
+        return stack.removeFirst()
     }
 
     fun push(elem: T): Stack<T> {
-        stack.add(elem)
+        stack.addFirst(elem)
 
         return this
     }
