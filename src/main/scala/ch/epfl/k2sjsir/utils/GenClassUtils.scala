@@ -270,7 +270,7 @@ object GenClassUtils {
         val lhs = VarRef(Ident(valueOfParamName))(ClassType("T"))
 
         val exceptionMsg = BinaryOp(BinaryOp.String_+, StringLiteral(s"Illegal enum constant ${desc.toJsName}."), lhs)
-        val exception: Tree = Throw(New(ClassType("jl_IllegalStateException"), Ident("init___T"), List(exceptionMsg)))
+        val exception: Tree = Throw(New(ClassType("jl_IllegalArgumentException"), Ident("init___T"), List(exceptionMsg)))
 
         entries.foldLeft(exception){ (acc, entry) =>
           val entryDesc = BindingUtils.getClassDescriptor(c.bindingContext(), entry)
