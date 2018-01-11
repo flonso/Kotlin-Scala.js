@@ -61,7 +61,7 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     assert(expected == content)
   }
 
-  protected def compileAndCheckIr(sources: Seq[String], mainPath: String = "", outFile: String = "out.js", optimize: Boolean = true) = {
+  protected def compileAndCheckIr(sources: Seq[String], mainClass: String = "", outFile: String = s"$ROOT_OUT/out.js", optimize: Boolean = true) = {
     val files = sources.map(s => s"$ROOT_SOURCE/$s")
     val options = Seq("-Xallow-kotlin-package", "-d", ROOT_OUT, "-kotlin-home", KOTLIN_HOME)
 
@@ -73,15 +73,17 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     if (exitCode != ExitCode.OK)
       fail(s"Compilation process finished with status $exitCode")
 
-    val mainMethod: List[String] = if (mainPath != "") List("-mm", mainPath) else Nil
+    val mainMethod: List[String] = if (mainClass != "") List("-mm", mainClass) else Nil
     val linkerArgs: List[String] = List(
       "--stdlib", s"$ROOT_LIB/$SCALA_JS_JAR",
       ROOT_OUT, ROOT_LIB_OUT,
-      "-o", s"$ROOT_OUT/$outFile",
+      "-o", s"$outFile",
       "-c",
       if (optimize) "-u" else "-n"
     )
     Scalajsld.main((linkerArgs ++ mainMethod).toArray)
+
+    reportJsSize(new File(s"$outFile"))
   }
 
   protected def assertExecResult(expected: String, sources: Seq[String], outFile: String = "out.js", mainClass: String = "Test") = {
@@ -139,6 +141,11 @@ trait BlackBoxTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
     val stream =  new PrintStream(baos)
     Console.withOut(stream)(thunk)
     baos.toString()
+  }
+
+
+  protected def reportJsSize(f: File): Unit = {
+    println("Size of the file is " + f.length().toDouble / 1000.0 + " kB")
   }
 
 }
