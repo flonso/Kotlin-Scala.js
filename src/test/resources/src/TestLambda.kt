@@ -1,3 +1,7 @@
+/*
+TODO: Free vars analysis to capture the variables of the scope before
+ */
+
 class TestClass {
 
     val myLambdaWithNoParamAndNoType: () -> Unit = {
@@ -60,7 +64,7 @@ object TestLambda {
         ml.funWithEqualSign(2)("Hello World")
         ml.myLambdaWithNoParamAndNoType()
         ml.myLambdaWithParamAndNoType("I'm a lambda with no return type and string param")
-        ml.myLambdaWithNoParamAndSring()
+        ml.myLambdaWithNoParamAndSring.invoke()
         ml.myLambdaWithParamsAndString(1, "plus 0.42 is", 1.42)
     }
 }

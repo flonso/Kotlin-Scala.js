@@ -26,7 +26,7 @@ case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
   private val arguments = genArguments().toList
 
   override def tree: Trees.Tree = {
-    assert(name == "js")
+    assert(name == "js", "GenJsFunc can only be called to handle Kotlin js() function calls")
 
     // JS function should only have one argument
     val tmp = resolvedCall.getCall.getValueArguments.asScala

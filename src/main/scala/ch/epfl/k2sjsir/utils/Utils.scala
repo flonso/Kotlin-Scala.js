@@ -33,7 +33,7 @@ object Utils {
 
     private def getNbOfParentDeclarations: Option[Int] = {
       val count = d.getContainingDeclaration match {
-        case c: ClassDescriptor => DescriptorUtils.getSuperclassDescriptors(c).size()
+        case c: ClassDescriptor => DescriptorUtils.getSuperclassDescriptors(c).asScala.count(!_.isInterface)
         case _ => 0
       }
 

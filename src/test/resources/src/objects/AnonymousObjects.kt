@@ -2,6 +2,12 @@ open class MyObjectOpenClass {
     open var x: String = ""
 }
 
+open class MyObjectOpenClassWithConstructor(val a: Int, val b: String) {
+    override fun toString(): String {
+        return "($a, $b)"
+    }
+}
+
 interface MyObjectInterface {
     var x: String
 
@@ -33,6 +39,10 @@ class AnonymousObjects {
         override var x: String = "publicFooWithClass.x"
     }
 
+    fun publicFooWithClassWithConstructor() = object: MyObjectOpenClassWithConstructor(42, "Hello World") {
+
+    }
+
     fun publicFooWithInterface() = object: MyObjectInterface {
         override var x: String = "publicFooWithInterface.x"
 
@@ -41,14 +51,26 @@ class AnonymousObjects {
         }
     }
 
+    fun doWithInterface(a: MyObjectInterface): String {
+        return a.x
+    }
+
+    fun doWithClass(a: MyObjectOpenClass): String {
+        return a.x
+    }
+
     fun bar() {
         val x0 = publicFoo()
         val x1 = foo().x
-        val x2 = publicFooWithClass().x
+        val x2 = doWithClass(publicFooWithClass())
+
         publicFooWithInterface().doNothing()
         publicFooWithInterface().printSomething()
-        val x3 = publicFooWithInterface().x
-        println("$x0 $x1 $x2 $x3")
+        val x3 = doWithInterface(publicFooWithInterface())
+
+        val x4 = publicFooWithClassWithConstructor()
+        println("$x0 $x1 $x2 $x3 $x4")
+
     }
 
 }
