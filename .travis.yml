@@ -27,3 +27,4 @@ before_cache:
 before_script:
   - cd $TRAVIS_BUILD_DIR
   - mkdir src/test/resources/out
+  - mkdir src/test/resources/benchmark_out
