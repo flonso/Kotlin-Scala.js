@@ -1,0 +1,132 @@
+\section{WebSockets}
+
+\subsection{History}
+
+\paragraph{} This last technology is the latest one. The first public draft 
+regarding the WebSocket API was published in April 2009 and was followed by a 
+few others between this date and September 2012 \cite{websocket-history}.
+
+WebSockets were designed to palliate the miss of a full-duplex, bi-directional 
+transmission channel for client-server communications.
+
+\paragraph{} \cite{guide-html5-websocket} As opposed to the Ajax and Comet 
+techniques, WebSocket is a web protocol based on the existing TCP/IP and HTTP 
+protocols which are at the root of almost every client-to-server web 
+interactions. The WebSocket protocol inherits mainly the asynchronous feature 
+of TCP and the text support of HTTP.
+
+
+%\subsection{How it works}
+
+\subsection{Chat application}
+
+\paragraph{} The WebSocket protocol is supported as for today by a lot of 
+different programming languages and libraries. That is why I will present 
+the standard WebSocket handshake protocol and will describe a short example 
+through the use of Javascript native WebSocket object.
+
+\paragraph{WebSocket Handshake} A WebSocket connection can only be started 
+through an HTTP request. The reason why is that this ensures full compatibility 
+with pre-WebSocket web servers.
+
+The following Javascript will initiate the handshake client-side :
+
+\begin{minted}[linenos, frame=leftline]{javascript}
+    var socket = new WebSocket(
+                "ws://echo.websocket.org/?encoding=text"
+            );
+\end{minted}
+
+\paragraph{} Once the WebSocket handshake is complete, the HTTP protocol 
+connection is shut down and is replaced by the WebSocket one on the same TCP/IP 
+channel.
+
+Figures \ref{fig:ws-handshake-request} and 
+\ref{fig:ws-handshake-response} illustrate a standard handshake request and 
+response to the websocket.org echo\footnote{An echo server is a server sending 
+back the original message} server.
+
+\paragraph{} The programmer will then be able to listen to new incoming 
+messages on the connection and react accordingly client-side through the native 
+Javascript WebSocket API.
+
+\begin{figure}[h]
+    \begin{minted}[frame=leftline, linenos]{text}
+    GET ws://echo.websocket.org/?encoding=text HTTP/1.1
+    Origin: http://websocket.org
+    Cookie: __utma=99as
+    Connection: Upgrade
+    Host: echo.websocket.org
+    Sec-WebSocket-Key: uRovscZjNol/umbTt5uKmw==
+    Upgrade: websocket
+    Sec-WebSocket-Version: 13
+    \end{minted}
+    \caption{WebSocket request sent by client \cite{websockets.org}}
+    \label{fig:ws-handshake-request}
+\end{figure}
+
+
+\begin{figure}[h]
+    \begin{minted}[frame=leftline, linenos]{text}
+    HTTP/1.1 101 WebSocket Protocol Handshake
+    Date: Fri, 10 Feb 2012 17:38:18 GMT
+    Connection: Upgrade
+    Server: Kaazing Gateway
+    Upgrade: WebSocket
+    Access-Control-Allow-Origin: http://websocket.org
+    Access-Control-Allow-Credentials: true
+    Sec-WebSocket-Accept: rLHCkw/SKsO9GAH/ZSFhBATDKrU=
+    Access-Control-Allow-Headers: content-type
+    \end{minted}
+    \caption{WebSocket response sent by server \cite{websockets.org}}
+    \label{fig:ws-handshake-response}
+\end{figure}
+
+\paragraph{} A concrete chat protocol can be quickly derived from this :
+
+\begin{itemize}
+ \item A user displays a page in his browser and loads all referenced 
+Javascripts.
+ \item One of the scripts initiates a WebSocket connection to a server and 
+attach different listeners to it.
+ \item When the message listener detects new incoming data, it displays them in 
+the web page.
+ \item The user can write text in a text field and click a send button which 
+will trigger Javascript whose task will be to transmit the message through the 
+opened WebSocket connection.
+\end{itemize}
+
+\subsection{Pros and cons}
+
+\paragraph{} Serious advantages of the WebSocket protocol are its truly 
+full-duplex and bi-directional communication possibilities. Thanks to this the 
+communication delays are considerably reduced.
+
+\paragraph{} Another advantage is its native support in most recent web 
+browsers through the Javascript language and also the countless number of 
+libraries providing support for it. A lot of them also provide different 
+automated fallback methods in case of a non-websocket supported environment 
+(however, they often require a server counterpart).
+
+\paragraph{} In comparison to the previously explained techniques, Websockets 
+also 
+benefit of a smaller amount of data to be transferred on each request. Cookies 
+and all request headers are only transmitted once on the handshake.
+
+\paragraph{} Since WebSockets are wrapped by a TCP channel, the server will know 
+quickly when the client disconnects without the need of using timeouts to 
+detect these cases.
+
+\paragraph{} One disadvantage at this point is that this technology is fairly 
+recent and its support on web servers often requires the installation of 
+additional libraries and packages.
+
+\paragraph{} Another downside of this protocol is the following : depending on 
+a client's configuration and on what network the client is connected to, the 
+connection will be handled differently, for instance, when surfing on mobile 
+devices through the mobile network. As a matter of fact, some 
+ISPs\footnote{Internet Service Provider} have configured proxy servers which 
+will act as a bridge between the mobile device and the server. As a consequence 
+of this the connection is expiring sooner than expected after some time of 
+inactivity on the 
+client side.

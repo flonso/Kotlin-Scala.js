@@ -1,0 +1,240 @@
+\chapter{Initial Setup}
+
+\paragraph{} As the last phase of this project was to integrate my work within 
+uJoin's source code, the installation process is written for the project to 
+work within it. I will later explain the dependencies required for both the 
+client and the server applications.
+
+\paragraph{} In the following sections \$LARAVEL\_ROOT, \$MOBILE\_ROOT and 
+\$CHAT\_ROOT will refer to the uJoin's API engine installation directory, to 
+the AngularJS client application directory and to this report source code 
+directory respectively.
+
+\section{Installing the server}
+
+\subsection{Installing Ratchet}
+
+\paragraph{} Installing Ratchet is very straightforward as it is installed 
+automatically by Composer. Simply execute the following commands in the command 
+line.
+
+\begin{minted}{bash}
+$ cd $LARAVEL_ROOT
+$ composer require cboden/Ratchet:0.3.*
+\end{minted}
+
+\subsection{Installing missing dependencies}
+
+\paragraph{} In order to install the chat server, you will need first to place 
+the sources in a workbench directory located in \$LARAVEL\_ROOT :
+
+
+\begin{minted}{bash}
+$ mkdir $LARAVEL_ROOT/workbench/
+$ cp -r $CHAT_ROOT/chatplugin $LARAVEL_ROOT/workbench/
+\end{minted}
+
+\paragraph{} After having copied the source code you will need to update the 
+composer autoload file :
+
+\begin{minted}{bash}
+$ cd $LARAVEL_ROOT/workbench/chatplugin/chat
+$ composer update
+\end{minted}
+
+\paragraph{} You need now to register the chat plugin, to open the \\
+\$LARAVEL\_ROOT/app/config/app.php and to add the following line to the 
+providers 
+array entry :
+
+\begin{minted}[linenos, frame=leftline]{php}
+<?php
+'providers' => array(
+    ...
+    'ChatPlugin\Chat\ChatServiceProvider',
+    ...
+),
+?>
+\end{minted}
+
+\paragraph{} In order to verify your installation until this point, please run 
+the command below. You should see the "Running for workbench 
+[chatplugin/chat]..." message, meaning that the plugin was successfully 
+registered.
+
+\begin{minted}{bash}
+$ cd $LARAVEL_ROOT
+$ php artisan dump-autoload
+\end{minted}
+
+\subsection{Running migrations}
+
+\paragraph{} In order for the chat server to handle connections correctly you 
+will also need to run the package migrations. You can do this by running the 
+following command :
+
+\begin{minted}{bash}
+ $ cd $LARAVEL_ROOT
+ $ php artisan migrate --bench="chatplugin/chat"
+\end{minted}
+
+\subsection{Filling up missing source code}
+
+\subsubsection{Ujoiner model}
+
+\paragraph{} The chat server needs to be able to retrieve conversations related 
+to a user. In order to do this, you need to add the following relation to the 
+Ujoiner model file located in the \$LARAVEL\_ROOT/app/models/ directory.
+
+
+\begin{minted}[linenos, frame=leftline]{php}
+<?php
+    public function conversations() {
+        return $this->belongsToMany(
+            'ChatPlugin\Chat\Models\ChatConversation', 
+            'chat_conversation_ujoiner',
+            'uJoinerID',
+            'conversationID'
+        );
+    }
+?>
+\end{minted}
+
+\paragraph{Note:} If you are not using uJoin's source code, it is possible to 
+provide a different user model through the plugin's config.php file located in 
+src/config. Please make sure that the model includes attributes id (32 bits, 
+char), username, firstName, lastName and imageURI \footnote{relative path to 
+the user's image location on the server, you may have to change the 
+chat.conversation.html template in \$MOBILE\_ROUTE/www\_src/app/views/chat} 
+otherwise the server won't work.
+
+\subsubsection{OAuth2Controller}
+
+\paragraph{} In order to be able to handle authentication without stopping, the 
+OAuth2-Controller will need to be modified a little. Please update the 
+verifyUserAccess method by first adding an optional boolean parameter like this:
+
+\begin{minted}[linenos, frame=leftline]{php}
+ <?php
+ public function verifyUserAccess($fromChatServer = false)
+ ?>
+\end{minted}
+
+\paragraph{} Then, locate the lines
+
+
+\begin{minted}[linenos, frame=leftline]{php}
+ <?php
+    // ...
+    if (!$this->server->verifyResourceRequest($request)) {
+        $this->server->getResponse()->send();
+        exit;
+    }
+    // ...
+ ?>
+\end{minted}
+
+\paragraph{} And change them to the following code :
+
+\begin{minted}[linenos, frame=leftline]{php}
+ <?php
+    // ...
+    if (!$this->server->verifyResourceRequest($request)) {
+        $response = $this->server->getResponse();
+        if ($fromChatServer) {
+            return $response;
+        }
+        else {
+            $response->send();
+            exit;
+        }
+    }
+    // ...
+ ?>
+\end{minted}
+
+\paragraph{Note:} If you are not using uJoin's source code, it is possible to 
+change the OAuth authentication controller and method in the config.php file. 
+Please make sure that the method takes a boolean as parameter to make the 
+difference between calls from the chat server and other calls. Make sure to 
+save the user model in the Config class with the key 'global.uJoinerAuth' in 
+order for the server to be able to retrieve the user.
+
+\subsection{Configuring the notifications}
+
+\paragraph{} As part of this project I had to implement notifications for the 
+chat. In order to comply to uJoin's API structure, I created two new models 
+which need to be added to the source code. To do so, please execute the 
+following command.
+
+\begin{minted}{bash}
+ $ cp $CHAT_ROOT/ChatConversationAction.php $LARAVEL_ROOT/app/models/
+ $ cp $CHAT_ROOT/ChatNotification.php $LARAVEL_ROOT/app/models/
+\end{minted}
+
+\paragraph{} In the \$CHAT\_ROOT you will also find a README.md file which 
+contains the remaining updates which need to be done in uJoin's source code in 
+order for the notifications to be fully operational.
+
+\paragraph{Note:} If you are not using uJoin's source code, it is possible to 
+change the notification helper class in the config.php file. 
+Please make sure that the methods described in the README.md file are present.
+
+If you don't want to use notifications, please disable them in the config.php 
+file by turning the enable\_notifs value to false.
+
+\subsection{Starting the server}
+
+\paragraph{} Finally, to start the chat server, you will need to execute the 
+hereunder command. You can specify a different port than the default one which 
+is 7778 by adding the optional argument --port.
+
+\begin{minted}[linenos, frame=leftline]{php}
+$ php artisan chat:server [--port=7778]
+\end{minted}
+
+
+\section{Installing the client}
+
+\paragraph{} Please first copy the files located in \$CHAT\_ROOT/www\_src to \\
+\$MOBILE\_ROOT/www\_src :
+
+\begin{minted}{bash}
+$ cp -r $CHAT_ROOT/www_src $MOBILE_ROOT/www_src
+\end{minted}
+
+\paragraph{} In order to be able to access the chat server, you will need to 
+configure the server's host address and port in the file and change the 
+corresponding values.
+
+\paragraph{} File file \$MOBILE\_ROOT/www\_src/app/config/chatConfig.js
+\begin{minted}{javascript}
+.constant('server', {
+    host: "127.0.0.1",
+    port: 7778, 
+    secured: false,
+    testing: false
+})
+\end{minted}
+
+\paragraph{} In order to be able to use the interface in uJoin's 
+application please apply the changes detailed in the README.md file located in 
+the \$MOBILE\_ROOT/www\_src folder.
+
+\paragraph{Note :} The interface was built specifically for uJoin's client 
+application source code, thus it will most likely not work if you use it in 
+another context. The chat dependencies are described in the README.md file.
+
+\section{Installing the Cordova plugin}
+
+\paragraph{} Since the chat client makes use of the native Javascript WebSocket 
+API, you need to install a cordova plugin in order to support them in the 
+native Android application. You can install the plugin through the following 
+command :
+
+\begin{minted}{bash}
+ $ cordova plugin add https://github.com/mkuklis/phonegap-websocket
+\end{minted}
+
+\paragraph{} This plugin does not add support for WebSockets on iOS 
+applications. However, the WebSocket API is natively supported since iOS 4.2.

@@ -4,4 +4,18 @@ out/
 project/
 target/
 
+*.aux
+*.log
+*.backup
+*.bbl
+*.blg
+*.brf
+*.kilepr
+*.toc
+*.out
+*.lof
+*.ent
+*.nav
+*.vrb
+*.snm
 .idea
