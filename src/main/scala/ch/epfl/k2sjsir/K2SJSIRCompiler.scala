@@ -91,9 +91,9 @@ object K2SJSIRCompiler {
       MainCallParameters.mainWithoutArguments
 
   private def configureLibraries(
-      arguments: K2SJSIRCompilerArgs,
-      paths: KotlinPaths,
-      messageCollector: MessageCollector): java.util.List[String] = {
+                                  arguments: K2SJSIRCompilerArguments,
+                                  paths: KotlinPaths,
+                                  messageCollector: MessageCollector): java.util.List[String] = {
     val libraries: java.util.List[String] = new SmartList[String]
 
     if (!arguments.noStdlib) {
@@ -122,15 +122,15 @@ object K2SJSIRCompiler {
   }
 }
 
-class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArgs] {
+class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArguments] {
 
-  override def createArguments = new K2SJSIRCompilerArgs()
+  override def createArguments = new K2SJSIRCompilerArguments()
 
   override protected def doExecute(
-      arguments: K2SJSIRCompilerArgs,
-      configuration: CompilerConfiguration,
-      rootDisposable: Disposable,
-      paths: KotlinPaths
+                                    arguments: K2SJSIRCompilerArguments,
+                                    configuration: CompilerConfiguration,
+                                    rootDisposable: Disposable,
+                                    paths: KotlinPaths
   ): ExitCode = {
 
     val messageCollector = configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
@@ -258,7 +258,7 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArgs] {
 
     ProgressIndicatorAndCompilationCanceledStatus.checkCanceled()
 
-    K2SJSIRCompilerArgs.dirtyCallToCompanion(translationResult.getDiagnostics, messageCollector)
+    K2SJSIRCompilerArguments.dirtyCallToCompanion(translationResult.getDiagnostics, messageCollector)
 
     if (!translationResult.isInstanceOf[TranslationResult.Success])
       return ExitCode.COMPILATION_ERROR
@@ -268,9 +268,9 @@ class K2SJSIRCompiler extends CLICompiler[K2SJSIRCompilerArgs] {
   }
 
   override def setupPlatformSpecificArgumentsAndServices(
-      configuration: CompilerConfiguration,
-      arguments: K2SJSIRCompilerArgs,
-      services: Services): Unit = {
+                                                          configuration: CompilerConfiguration,
+                                                          arguments: K2SJSIRCompilerArguments,
+                                                          services: Services): Unit = {
     configuration.put[jl.Boolean](JSConfigurationKeys.SOURCE_MAP, true)
     configuration.put(JSConfigurationKeys.TARGET, EcmaVersion.defaultVersion)
     configuration.put(JSConfigurationKeys.MODULE_KIND, ModuleKind.PLAIN)

@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.resolve.diagnostics.Diagnostics;
 
 import static org.jetbrains.kotlin.cli.common.arguments.K2JsArgumentConstants.MODULE_PLAIN;
 
-public class K2SJSIRCompilerArgs extends CommonCompilerArguments {
+public class K2SJSIRCompilerArguments extends CommonCompilerArguments {
 
     public static Boolean dirtyCallToCompanion(Diagnostics diagnostics, MessageCollector messageCollector) {
         return AnalyzerWithCompilerReport.Companion.reportDiagnostics(diagnostics, messageCollector);
