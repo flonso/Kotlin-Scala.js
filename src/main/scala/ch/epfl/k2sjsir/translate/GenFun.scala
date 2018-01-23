@@ -19,7 +19,6 @@ case class GenFun(d: KtNamedFunction)(implicit val c: TranslationContext) extend
     val body = GenBody(d.getBodyExpression).treeOption
     val idt = desc.toJsMethodDeclIdent
     val extensionParam = Option(desc.getExtensionReceiverParameter).map(_.toJsParamDef)
-    // FIXME: Dirty hack to pass instance of interface to the default implementation
     // See org.jetbrains.kotlin.backend.jvm.codegen.FunctionCodegen.kt line 56
     val interfaceParam = {
       if (isInterface)

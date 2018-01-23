@@ -32,6 +32,10 @@ class MyClassWithAccessors {
         set(myVal) {
             field = myVal + "_set"
         }
+
+    var nodefault: Int
+        get() = 2
+        set(value: Int) {}
 }
 
 object TestAccessorsGen {

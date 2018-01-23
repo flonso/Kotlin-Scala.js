@@ -47,13 +47,17 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |ONE
         |Zero is Zero !
         |42 32 42
-        |Hello Worlddummy from parent
+        |Hello World
+        |dummy from parent
         |dummy from child
         |var a from super = 0
         |var a from child = 1
         |var b from super = 5
         |A
         |B
+        |MyObjectWithSuper.f
+        |B
+        |MyOtherInterface
         |First initializer block that prints Toto
         |Second initializer block that prints 4
         |First property: Toto

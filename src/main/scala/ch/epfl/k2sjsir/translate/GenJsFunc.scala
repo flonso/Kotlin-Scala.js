@@ -37,16 +37,6 @@ case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
     val argAsString = tmp.slice(1, tmp.length - 1)
 
     argAsString match {
-      // TODO: Verify this
-      case "array[i] = value;" =>
-        val arrayTpe = ArrayType(ArrayTypeRef("C", 1))
-        ArraySelect(VarRef(Ident("array"))(arrayTpe), VarRef(Ident("i"))(IntType))(AnyType)
-
-      // TODO: Verify this
-      case "new Uint16Array(size)" =>
-        val arrayTpe = ArrayType(ArrayTypeRef("LUint16Array", 1))
-        NewArray(arrayTpe, List(VarRef(Ident("size"))(IntType)))
-
       case "Kotlin.identityHashCode" =>
         Apply(LoadModule(ClassType("jl_System$")),
               Ident("identityHashCode__O__I"),
@@ -93,7 +83,7 @@ case class GenJsFunc(d: KtCallExpression)(implicit val c: TranslationContext)
       case "Kotlin.Long.MAX_VALUE" =>
         LongLiteral(Long.MaxValue)
 
-      case _ => notImplemented(s"using argument $argAsString")
+      case _ => notImplemented(s"using argument $argAsString ")
     }
   }
 

@@ -1,5 +1,7 @@
 resources/lib/
 out/
+benchmark_out/
+docs/presentation/_minted-presentation/
 
 project/
 target/

@@ -36,6 +36,8 @@ case class GenProperty(d: KtProperty)(implicit val c: TranslationContext) extend
       case c: ClassDescriptor => c
       case _ => null
     }
+
+    // FIXME: Generating a backing field should only happen if one of the defaults is used, or if the field keyword is used
     val t = {
       if ((d.isVar || d.hasInitializer) && cd != null && !cd.isInterface)
         List(tree)

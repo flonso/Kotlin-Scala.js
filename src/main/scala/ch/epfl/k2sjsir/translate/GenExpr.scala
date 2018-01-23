@@ -24,6 +24,7 @@ import scala.collection.JavaConverters._
 
 case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends Gen[KtExpression] {
 
+  //TODO: Unit expression is not translated
   override def tree: Tree = {
     d match {
       case ce: KtCallExpression =>
@@ -332,7 +333,7 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
     val b1 = ensureBoxed(b0)
     val b = Block(varDefs ++ List(b1))
 
-
+    // TODO: Either make use of a context or perform free variable analysis to capture variables
     val closureParams = desc.getValueParameters.asScala.map(_.toJsClosureParamDef).toList
     val closure = containingClass match {
       case Some(_) =>

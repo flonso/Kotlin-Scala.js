@@ -1,6 +1,24 @@
+//FIXME: Interface declaration signature is wrong
+interface I1 {
+    fun a()
+}
+
+class C1 : I1 {
+    override fun a() {
+        println("Hello")
+    }
+}
+
 
 object TestInterface {
     fun main(args: Array<String>) {
+        /*
+        val c1 = C1()
+        c1.a()
+        val i: I1 = C1()
+        i.a()
+        */
+
         val myClass = MyInterfacedClass("Hello World")
         println(myClass)
 

@@ -45,3 +45,15 @@ class MyClassWithTwoParents : MyOtherParentWithSuper(), MyInterfaceWithSuper {
         super<MyInterfaceWithSuper>.f()
     }
 }
+
+interface MyOtherInterface {
+    fun f() = println("MyOtherInterface")
+}
+
+object MyObjectWithSuper: MyInterfaceWithSuper, MyOtherInterface {
+    override fun f() {
+        println("MyObjectWithSuper.f")
+        super<MyInterfaceWithSuper>.f()
+        super<MyOtherInterface>.f()
+    }
+}

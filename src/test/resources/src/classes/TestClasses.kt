@@ -44,6 +44,8 @@ fun myClassWithSuperTest() {
     c.test()
     val c2 = MyClassWithTwoParents()
     c2.f()
+
+    MyObjectWithSuper.f()
 }
 
 fun myDataClassTest() {

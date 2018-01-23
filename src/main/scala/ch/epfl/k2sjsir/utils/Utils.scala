@@ -1,19 +1,17 @@
 package ch.epfl.k2sjsir.utils
 
 import ch.epfl.k2sjsir.utils.NameEncoder._
-import org.jetbrains.kotlin.descriptors._
 import org.jetbrains.kotlin.descriptors.impl.AnonymousFunctionDescriptor
+import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind, _}
+import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
+import org.jetbrains.kotlin.psi.{KtFile, KtProperty}
+import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
+import org.jetbrains.kotlin.resolve.`lazy`.descriptors.LazyPackageDescriptor
 import org.jetbrains.kotlin.types.{KotlinType, TypeUtils}
 import org.scalajs.core.ir.Trees._
 import org.scalajs.core.ir.Types._
 import org.scalajs.core.ir.{ClassKind, Definitions, Position, Types}
-import org.jetbrains.kotlin.descriptors.{ClassKind => KtClassKind}
-import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
-import org.jetbrains.kotlin.psi.{KtExpression, KtFile, KtProperty}
-import org.jetbrains.kotlin.resolve.{BindingContext, DescriptorUtils}
-import org.jetbrains.kotlin.resolve.`lazy`.descriptors.{LazyClassDescriptor, LazyPackageDescriptor}
-import org.scalajs.core.ir
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.List

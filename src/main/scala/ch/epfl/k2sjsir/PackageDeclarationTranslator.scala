@@ -44,8 +44,6 @@ final class PackageDeclarationTranslator private(
 
     for (file <- files) {
       try {
-        messageCollector.report(CompilerMessageSeverity.INFO,s"Compiling file ${file}", null)
-
         val topLevelFunctions = new mutable.MutableList[KtNamedFunction]()
         val topLevelValues = new mutable.MutableList[KtProperty]()
         val declarations = new SJSIRLower().lower(file)
@@ -109,15 +107,6 @@ final class PackageDeclarationTranslator private(
             case _ => false
           }
 
-
-          // TODO: Remove after using option mm in Scalajsld (as well as TopLevelModuleExportDef)
-          def manualExports(): List[MemberDef] = {
-            val args = List(ArrayValue(ArrayType(ArrayTypeRef.of(ClassRef(Definitions.StringClass))), Nil))
-            val body = Block(ApplyStatic(clsTpe, Ident("main__AT__V", Some("main"))(pos), args)(NoType)(pos), Undefined()(pos))(pos)
-            val main = MethodDef(static = false, StringLiteral("main")(pos), Nil, AnyType, Some(body))(OptimizerHints.empty, None)(pos)
-            List(main)
-          }
-
           val cls = ClassDef(
               Ident(encodedName)(pos),
               ClassKind.ModuleClass,
@@ -126,9 +115,8 @@ final class PackageDeclarationTranslator private(
               List(),
               None,
               None,
-              ctorAndDefs/* ++ (if (hasMain) manualExports() else Nil)*/,
-              Nil
-              /*List(TopLevelModuleExportDef(className)(pos))*/)(OptimizerHints.empty)(pos)
+              ctorAndDefs,
+              Nil)(OptimizerHints.empty)(pos)
 
           val name = encodedName.drop(1).replace("_", "/")
           SJSIRCodegen.genIRFile(output, name, cls)

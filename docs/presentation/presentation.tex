@@ -1,4 +1,4 @@
-\documentclass[10pt]{beamer}
+\documentclass[10pt,usenames,dvipsnames]{beamer}
 \usepackage{pgfpages}
 %\setbeameroption{show notes on second screen}
 
@@ -24,7 +24,6 @@
 \usepackage{listings}
 \usepackage{appendixnumberbeamer}
 
-
 \setsansfont[BoldFont={Fira Sans SemiBold}]{Fira Sans Book}
 \usebackgroundtemplate{\includegraphics[width=\paperwidth,height=\paperheight]{imgs/background2.png}}
 
@@ -48,6 +47,7 @@
 \renewcommand{\baselinestretch}{1.5}
 
 \AtBeginEnvironment{minted}{
+  \renewcommand{\fcolorbox}[4][]{#4}
   \renewcommand{\baselinestretch}{1.0}
   \fontsize{9}{9}\selectfont
 }
@@ -375,8 +375,7 @@ class LAccessors extends O {
 
 \subsection{Interfaces}
 
-
-\begin{frame}{Interfaces}
+\begin{comment}
  \begin{itemize}
   \item Interfaces are translated with abstract method bodies
   \item They can also define default implementations for their methods :
@@ -386,6 +385,14 @@ class LAccessors extends O {
      \item If not overridden, bridges are generated in implementing classes
     \end{itemize}
  \end{itemize}
+\end{comment}
+
+\begin{frame}{Interfaces}
+  \begin{itemize}
+   \item Interfaces are translated with abstract method bodies
+   \item The default implementations are stored in a separate class
+  \end{itemize}
+
 \end{frame}
 
 \begin{frame}[fragile]{Interfaces - A default implementation}
@@ -790,8 +797,95 @@ static def casts__O__V(anyVal: any) {
 \end{frame}
 
 
-\begin{frame}{Enum classes}
+\begin{frame}[fragile]{Enum classes}
+ \begin{minted}[bgcolor=minted-bg]{kotlin}
+enum class Fruits {
+  APPLE, BANANA, PEACH
+}
+ \end{minted}
  
+ \begin{itemize}
+  \item Enum entries are classes themselves
+  \item The compiler generates the \ktinline{values()} and \ktinline{valueOf(s: String)} methods.
+  \item All entries and functions are stored inside a module class
+ \end{itemize}
 \end{frame}
+
+\begin{frame}[fragile]{Enum classes - A fruity example}
+ 
+  \begin{minted}[bgcolor=minted-bg, breaklines=true]{scala}
+// Fruits$APPLE.sjsir, Fruits$BANANA.sjsir and Fruits$PEACH.sjsir
+class LFruits$APPLE extends LFruits {
+  def init___T__I(_name: T, _ordinal: int) {
+    this.LFruits::init___T__I(_name, _ordinal)
+  }
+}
+  \end{minted}
+  \begin{minted}[bgcolor=minted-bg, breaklines=true]{scala}
+// Fruits.sjsir
+class LFruits extends jl_Enum {
+  def init___T__I(_name: T, _ordinal: int) {
+    this.jl_Enum::init___T__I(_name, _ordinal)
+  }
+}
+  \end{minted}
+  
+\end{frame}
+
+\begin{frame}[fragile]{Enum classes - Fruits\$.sjsir}
+  \begin{minted}[bgcolor=minted-bg, breaklines=true]{scala}
+module class LFruits$ extends O {
+  def valueOf__T__LFruits(string: T): LFruits = {
+    if (string.equals__O__Z("PEACH")) {
+      this.PEACH$1    
+    } else { /* ... */
+      throw new jl_IllegalArgumentException()
+        .init___T(/* ... */)
+    }
+  }
+  val $VALUES: LFruits[]
+  def values__ALFruits(): LFruits[] = {
+    this.$VALUES.clone__O().asInstanceOf[LFruits[]]
+  }
+  def init___() {
+    this.O::init___();
+    this.APPLE$1 = new LFruits$APPLE().init___T__I("APPLE", 0);
+    // omitting other entries
+    this.$VALUES = LFruits[](this.APPLE$1, this.BANANA$1, this.PEACH$1)
+  }
+}
+
+  \end{minted}
+\end{frame}
+\begin{frame}{Anonymous objects}
+ \begin{itemize}
+  \item Translated as normal objects
+  \item Declaration is replaced with a \scalainline{New()} SJSIR node
+ \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Anonymous objects - Example}
+ \begin{minted}[bgcolor=minted-bg]{kotlin} 
+fun foo() {
+  val adHoc = object {
+    var x: Int = 0
+    var y: Int = 0
+  }
+  print(adHoc.x + adHoc.y) // prints 0
+}
+ \end{minted}
+
+  \begin{minted}[bgcolor=minted-bg, breaklines=true]{scala}
+def foo__V() {
+  val adHoc = new Lfoo_Main$NoNameProvided().init___();
+  mod:s_Predef$.print__O__V((adHoc.x__I() +[int] adHoc.y__I()));
+  (void 0)
+}
+  \end{minted}
+\end{frame}
+
+
+
 
 \end{document}

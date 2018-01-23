@@ -26,9 +26,8 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
   private val args = genArgs().toList
 
   /*
-   * Calls to the invoke() function can either be implicit (class.mylambda(args))
-   * or explicit (Object::funReference).invoke(args)).
-   * The descriptor doesn't allow to differentiate such calls directly.
+   * isDirectInvokeCall is used to differentiate when a call is performed on a class property
+   * This should be changed as its really not reflecting the underlying logic (use resolved call and desc for that)
    * TODO: Replace the isDirectInvokeCall with a retrieval of the property the call is applied to
    */
   private val isLambdaCall = name == "invoke"
