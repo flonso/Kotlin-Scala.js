@@ -38,6 +38,11 @@
 \setbeamercolor{title}{bg=, fg=white}
 \setbeamercolor{section title}{bg=, fg=white}
 \setbeamercolor{frametitle}{bg=, fg=white}
+\setbeamercolor{normal text}{bg=, fg=black}
+
+% custom fonts
+\setbeamercolor{page number in head/foot}{fg=green}
+\setbeamerfont{page number in head/foot}{size=\normalsize}
 
 % line stretch
 \renewcommand{\baselinestretch}{1.5}
@@ -95,6 +100,13 @@ typeof, class, interface, enum, object, override, public, private, get, set, imp
  - null safety 
  
  + have a hello world project ready just in case
+ 
+ 
+ Comments for presentation
+ - page number in white and bigger
+ - background -> need more contrast between text and background
+ - s. 10 -> inverse the two : kotlin example first, avoid explaining with text what code can show
+ - s. 15 -> applystatic first, applystatically ~= invokespecial in JVM calls an instance method with static dispatch
 \end{comment}
 
 
@@ -122,9 +134,9 @@ typeof, class, interface, enum, object, override, public, private, get, set, imp
 \begin{frame}{Project Goals}
  \begin{itemize}
   \item Continue the work started by Guillaume Tournigand and Lionel Fleury
+  \item Validate the generic nature of the Scala.js IR
   \item Compile Kotlin Standard Library to the Scala.js IR
   \item Develop Gradle tooling
-  \item Validate the generic nature of the Scala.js IR
  \end{itemize}
 
 \end{frame}
@@ -219,6 +231,7 @@ fun main(args: Array<String>) {
 
 \begin{frame}[fragile]{Null safety operators - Safe call and elvis operator}
 
+\onslide<1->
 \begin{minted}[bgcolor=minted-bg]{kotlin}
 fun nullSafety(canBeNull: String?): Int {
     return canBeNull?.length ?: 0
@@ -227,6 +240,26 @@ fun nullSafety(canBeNull: String?): Int {
 
 \onslide<2->
  \begin{minted}[bgcolor=minted-bg]{scala}
+static def nullSafety__T__I(canBeNull: T): int = {
+  val tmp$1: T = canBeNull;
+  if ((tmp$1 !== null)) {
+    tmp$1.length__I()
+  } else {
+    null
+  }
+}
+ \end{minted}
+
+\end{frame}
+
+\begin{frame}[fragile]{Null safety operators - Safe call and elvis operator}
+\begin{minted}[bgcolor=minted-bg]{kotlin}
+fun nullSafety(canBeNull: String?): Int {
+    return canBeNull?.length ?: 0
+}
+\end{minted}
+
+ \begin{minted}[bgcolor=minted-bg, highlightlines={4-9}]{scala}
 static def nullSafety__T__I(canBeNull: T): int = {
   return {
     val tmp$0: jl_Integer = {
@@ -283,16 +316,6 @@ static def assertNotNull__O__V(cantBeNull: any) {
 \end{frame}
 
 \begin{frame}[fragile]{Properties accessors - Backing field in Scala}
-  
-  In Scala, a backing field would look like this : 
-  
-  \begin{minted}[bgcolor=minted-bg]{scala}
-class Accessors {
-  private var _counter = 0 // <- the backing field
-  def counter = _counter
-  def counter_= (value: Int) = { _counter = value }
-}
-  \end{minted}
 
   The \ktinline{field} keyword is simply a placeholder for the compiler-generated backing field.
   
@@ -301,6 +324,18 @@ class Accessors {
   var counter = 0
     get() = field
     set(value: Int) { field = value }
+}
+  \end{minted}
+  
+  \onslide<2->
+  In Scala, a backing field would look like this : 
+  
+  \onslide<2->
+  \begin{minted}[bgcolor=minted-bg]{scala}
+class Accessors {
+  private var _counter = 0 // <- the backing field
+  def counter = _counter
+  def counter_= (value: Int) = { _counter = value }
 }
   \end{minted}
 
@@ -357,7 +392,7 @@ class LAccessors extends O {
  \onslide<1->
  \begin{minted}[bgcolor=minted-bg]{kotlin}
 interface Dummy {
-  val a: String
+  val a: String // no backing field allowed !
     get() = "Hello from an interface"
 }
  \end{minted}
@@ -398,9 +433,7 @@ class LMyClass extends O implements LDummy {
   def a__T(): T = {
     LDummy$DefaultImpls::a__LDummy__T(this)
   }
-  def init___() {
-    this.O::init___()
-  }
+  // init
 }
  \end{minted}
  
@@ -415,16 +448,20 @@ class LMyClass extends O implements LDummy {
  Super calls must also be translated depending on which instance they refer to :
  
  \begin{itemize}
-  \item Reference to a class as an SJSIR \scalainline{ApplyStatically()} node
-  \item Reference to an interface implementation as an SJSIR \scalainline{ApplyStatic()} node
+  \item Reference to a (parent) class
+  \item Reference to an interface's default implementation
  \end{itemize}
  }
  
  \only<2>{
+  Interface :
   \begin{itemize}
-   \item \scalainline{ApplyStatically()} indicates a dispatch to a given class type without looking at the receiver's type.
-   
    \item \scalainline{ApplyStatic()} applies a static method for a given class type.
+  \end{itemize}
+  
+  Parent class :
+  \begin{itemize}
+   \item \scalainline{ApplyStatically()} indicates a static dispatch to a given class type on the receiver's instance (\~= invokespecial).
   \end{itemize}
 
  }
@@ -469,13 +506,13 @@ class MyChild: MyParent(), I {
   }
 \end{comment}
 
- \begin{minted}[bgcolor=minted-bg]{scala}
+ \begin{minted}[bgcolor=minted-bg, highlightlines={5-6}]{scala}
 class LMyChild extends LMyParent implements LI {
   // 'a' field accessors
   
   def example__V() {
-    LI$DefaultImpls::a__LI__T(this);
-    this.LMyParent::a__T();
+    LI$DefaultImpls::a__LI__T(this); // ApplyStatic
+    this.LMyParent::a__T(); // ApplyStatically
     this.a__T();
     (void 0)
   }
@@ -490,21 +527,28 @@ class LMyChild extends LMyParent implements LI {
 
 \subsection{Lambdas}
 
-\begin{frame}[fragile]{Lambdas}
- Lambdas in Kotlin (as in Scala) can be declared inside a \ktinline{var}, a \ktinline{val} or a \ktinline{fun}.
+\begin{frame}[fragile]{Lambdas} 
+ In Kotlin JS, Kotlin.FunctionX are JavaScript functions.
  
- At translation : PUT SCALA JS ANON AND KOTLIN FUN TO NOT FORGET TO MENTION
+ In Scala.js, Scala functions are wrapped. They are JavaScript objects.
+ 
+ % sjs_AnonFun = wrapper to provide scala function interface --> semantics of the language
+ % In Kotlin FunctionX is a js functions
+ 
+ To stick to the Kotlin JS semantics, translate them as closures :
  \begin{itemize}
-  \item Captured variables are passed as parameters named \ktinline{closurearg\$name} and of type \ktinline{Any}
-  \item Parameters are assigned to local variables matching their original name and cast accordingly.
+  \item Formal parameters of type \ktinline{Any}
+  \item Inside the body, parameters are cast to the declared type
  \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{Lambdas - Example}
  \onslide<1->
  \begin{minted}[bgcolor=minted-bg]{kotlin}
-var times: (Int, Int) -> Int = { a,b ->
-  return a * b
+class Dummy {
+  var times: (Int, Int) -> Int = { a,b ->
+    a * b
+  }
 }
  \end{minted}
  \onslide<2->
@@ -531,12 +575,26 @@ this.times = (lambda<$this: LDummy = this>(
 js("Kotlin.identityHashCode")(3)
   \end{minted}
 
-  Because Scala.js interacts with JavaScript through Facades, there is no generic way of translating this function.
+%  Because the Scala.js IR doesn’t allow inserting a JS string verbatim inside the code. This is to prevent breaking IR abstractions.
+
+  Breaks the compiler abstraction. The Scala.js IR doesn't allow that.
   
-  It must be handled case by case.
+  It must therefore be handled case by case.
 
 \end{frame}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% OTHER ADDITIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Other additions}
+
+\begin{frame}{Other additions}
+ \begin{itemize}
+  \item Qualified this
+  \item Type checks and casts
+  \item Enum classes
+  \item Anonymous objects
+ \end{itemize}
+
+\end{frame}
 
 
 \section{Gradle Plugin}
@@ -583,9 +641,6 @@ The plugin offers various options to setup the compiler or the Scala.js linker. 
  \begin{minted}[bgcolor=minted-bg, breaklines=true]{kotlin}
 // build.gradle
 k2sjs {
-  kotlinHome = "/usr/share/kotlin"
-  dstFile = "./web/js/mycode.js"
-  compilerOptions = "-verbose"
   optimize = "fullOpt"
 }
  \end{minted}
@@ -601,7 +656,7 @@ k2sjs {
   3 benchmarks were implemented to test the compiler :
 
  \begin{itemize}
-  \item DeltaBlue, testing objection oriented capabilities
+  \item DeltaBlue, testing object oriented capabilities
   \item Richards, testing array operations
   \item SHA512, testing \ktinline{Long} operations
  \end{itemize}
@@ -632,7 +687,7 @@ k2sjs {
         \includegraphics[height=5.5cm]{imgs/sha512.png}
         \caption{SHA512}
     \end{subfigure}}
-    \caption*{Results in Firefox and Chrome (lower is better)}
+    \caption*{Results in Firefox and Chrome (execution times, lower is better)}
     \label{chart_chrome}
 \end{figure}
 \end{frame}
@@ -657,6 +712,8 @@ k2sjs {
 \end{frame}
 
 \appendix
+
+\section{Backup slides}
 
 
 \begin{frame}[fragile]{Type checks and casts}
