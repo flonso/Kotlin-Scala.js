@@ -98,7 +98,8 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
                   Apply(ref, m.getterIdent(), List())(tpe)
 
                 case _: ImplicitClassReceiver | _: ExpressionReceiver =>
-                  val rcv = genThisFromContext(recv.toJsClassType, m)
+                  val funDesc = BindingContextUtils.getEnclosingFunctionDescriptor(c.bindingContext(), kn)
+                  val rcv = genThisFromContext(recv.toJsClassType, funDesc)
                   Apply(rcv, m.getterIdent(), List())(tpe)
 
                 case _ =>
@@ -224,8 +225,8 @@ case class GenExpr(d: KtExpression)(implicit val c: TranslationContext) extends 
         val desc = getClassDescriptorForType(tpe)
 
         val funDesc = BindingContextUtils.getEnclosingFunctionDescriptor(c.bindingContext(), k)
-        if (funDesc != null && DescriptorUtils.isExtension(funDesc))
-          VarRef(Ident("$this"))(tpe.toJsType)
+        if (funDesc != null && DescriptorUtils.isExtension(funDesc) || funDesc.isAnonymousFunction)
+          genThisFromContext(tpe.toJsType, funDesc)
         else
           genThisFromContext(tpe.toJsType, desc)
 

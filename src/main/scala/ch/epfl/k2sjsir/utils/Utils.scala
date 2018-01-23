@@ -2,6 +2,7 @@ package ch.epfl.k2sjsir.utils
 
 import ch.epfl.k2sjsir.utils.NameEncoder._
 import org.jetbrains.kotlin.descriptors._
+import org.jetbrains.kotlin.descriptors.impl.AnonymousFunctionDescriptor
 import org.jetbrains.kotlin.resolve.DescriptorUtils._
 import org.jetbrains.kotlin.types.{KotlinType, TypeUtils}
 import org.scalajs.core.ir.Trees._
@@ -67,6 +68,8 @@ object Utils {
       val cls = DescriptorUtils.getContainingClass(d)
       cls != null && cls.isExternal
     }
+
+    def isAnonymousFunction: Boolean = d.isInstanceOf[AnonymousFunctionDescriptor]
 
     def getNameEvenIfAnon: String = d.getName.toString.replace("<no name provided>", "anonymous")
   }
@@ -301,12 +304,22 @@ object Utils {
 
   def genThisFromContext(tpe: Type, cmd: CallableMemberDescriptor = null)(implicit pos: Position): Tree = {
     if (cmd != null) {
+
       val dr = cmd.getDispatchReceiverParameter
 
       if (dr != null) {
         val clsDesc = DescriptorUtils.getClassDescriptorForType(dr.getType)
 
         return genThisFromContext(tpe, clsDesc)
+      }
+
+      cmd match {
+        case a: AnonymousFunctionDescriptor =>
+          val clsDesc = DescriptorUtils.getContainingClass(a)
+          return VarRef(Ident("$this"))(clsDesc.toJsClassType)
+        case f: FunctionDescriptor if DescriptorUtils.isExtension(f) =>
+          return VarRef(Ident("$this"))(tpe)
+        case _ => /* Skip */
       }
     }
 

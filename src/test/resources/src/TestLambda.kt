@@ -1,8 +1,8 @@
 /*
 TODO: Free vars analysis to capture the variables of the scope before
  */
-
 class TestClass {
+    val tmp = "Class property"
 
     val myLambdaWithNoParamAndNoType: () -> Unit = {
         println("I'm the body of a lambda with no param and no ret type")
@@ -24,10 +24,21 @@ class TestClass {
         ret
     }
 
+    val myLambdaWithThis: () -> Unit = {
+        println("$tmp called with implicit receiver")
+        println("${this.tmp} called with explicit this")
+        myPrint("Called with implicit receiver")
+        this.myPrint("Called with explicit this")
+    }
+
     fun oneLine(x: Int) = x * 2
 
     fun oneLine2(x: Int) : Int {
         return x * 2
+    }
+
+    fun myPrint(s: String) {
+        println(s)
     }
 
     fun funWithEqualSign(b: Int): (String) -> Unit = { a ->
@@ -66,5 +77,6 @@ object TestLambda {
         ml.myLambdaWithParamAndNoType("I'm a lambda with no return type and string param")
         ml.myLambdaWithNoParamAndSring.invoke()
         ml.myLambdaWithParamsAndString(1, "plus 0.42 is", 1.42)
+        ml.myLambdaWithThis()
     }
 }

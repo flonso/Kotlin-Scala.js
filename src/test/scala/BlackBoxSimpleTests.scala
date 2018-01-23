@@ -516,6 +516,10 @@ class BlackBoxSimpleTests extends BlackBoxTest {
         |I'm a lambda with no return type and string param
         |I'm the body of a lambda with no param and ret type string
         |Lambda with params and ret string : 1 plus 0.42 is 1.42
+        |Class property called with implicit receiver
+        |Class property called with explicit this
+        |Called with implicit receiver
+        |Called with explicit this
       """.stripMargin, Seq("TestLambda.kt"), mainClass = "TestLambda.main")
   }
 

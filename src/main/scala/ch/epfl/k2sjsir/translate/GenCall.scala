@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.js.translate.context.TranslationContext
 import org.jetbrains.kotlin.js.translate.utils.BindingUtils
 import org.jetbrains.kotlin.psi._
-import org.jetbrains.kotlin.resolve.{DescriptorToSourceUtils, DescriptorUtils}
+import org.jetbrains.kotlin.resolve.{BindingContextUtils, DescriptorToSourceUtils, DescriptorUtils}
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt
 import org.jetbrains.kotlin.resolve.scopes.receivers.{ExpressionReceiver, ExtensionReceiver, ImplicitClassReceiver, ReceiverValue}
 import org.jetbrains.kotlin.types.TypeUtils
@@ -160,8 +160,10 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
                     val cls = i.getClassDescriptor
                     if (cls.isCompanionObject)
                       LoadModule(cls.toJsClassType)
-                    else
-                      genThisFromContext(i.getClassDescriptor.toJsClassType)
+                    else {
+                      val funDesc = BindingContextUtils.getEnclosingFunctionDescriptor(c.bindingContext(), d)
+                      genThisFromContext(i.getClassDescriptor.toJsClassType, funDesc)
+                    }
 
                   case _: ExtensionReceiver =>
                     val dr = desc.getDispatchReceiverParameter
@@ -271,7 +273,7 @@ case class GenCall(d: KtCallExpression)(implicit val c: TranslationContext) exte
   }
 
   private def isTopLevelFunction(sf: SimpleFunctionDescriptor) =
-    sf.getExtensionReceiverParameter == null && sf.getContainingDeclaration.getName.asString() == "<root>"
+    sf.getExtensionReceiverParameter == null && DescriptorUtils.isTopLevelDeclaration(sf)
 
 
   private def arrayOps(receiver: Tree, tpe: Type, method: String, args: List[Tree]) : Option[Tree] = {
