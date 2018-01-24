@@ -399,7 +399,7 @@ class LAccessors extends O {
  \onslide<1->
  \begin{minted}[bgcolor=minted-bg]{kotlin}
 interface Dummy {
-  val a: String // no backing field allowed !
+  val a: String
     get() = "Hello from an interface"
 }
  \end{minted}
@@ -534,10 +534,10 @@ class LMyChild extends LMyParent implements LI {
 
 \subsection{Lambdas}
 
-\begin{frame}[fragile]{Lambdas} 
- In Kotlin JS, Kotlin.FunctionX are JavaScript functions.
+\begin{frame}[fragile]{Lambdas}
+ In Kotlin JS, anonymous functions are JavaScript functions.
  
- In Scala.js, Scala functions are wrapped. They are JavaScript objects.
+ In Scala.js, they are wrapped and are JavaScript objects.
  
  % sjs_AnonFun = wrapper to provide scala function interface --> semantics of the language
  % In Kotlin FunctionX is a js functions
